@@ -30,6 +30,9 @@ cc_library(
     ),
     copts = CURVE_DEFAULT_COPTS,
     visibility = ["//visibility:public"],
+    linkopts = [
+        "-lrt",
+    ],
     deps = [
         "//src/common:curve_common",
         "//src/common:curve_auth",
