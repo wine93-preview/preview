@@ -227,6 +227,20 @@ struct FileSystemOption {
 };
 // }
 
+// { block cache option
+struct DiskCacheOption {
+    uint32_t index;
+    std::string cacheDir;
+    uint64_t cacheSize;
+    double freeSpaceRatio;
+};
+
+struct BlockCacheOption {
+    bool stage;
+    std::vector<DiskCacheOption> diskCacheOptions;
+};
+// }
+
 struct FuseClientOption {
     MdsOption mdsOpt;
     MetaCacheOpt metaCacheOpt;
@@ -241,6 +255,7 @@ struct FuseClientOption {
     RefreshDataOption refreshDataOption;
     KVClientManagerOpt kvClientManagerOpt;
     FileSystemOption fileSystemOption;
+    BlockCacheOption blockCacheOption;
 
     uint32_t listDentryLimit;
     uint32_t listDentryThreads;
