@@ -22,8 +22,10 @@
 
 DEFINE_int32(disk_check_duration_millsecond, 1 * 1000,
              "disk health check duration in millsecond");
+
 namespace curvefs {
 namespace client {
+namespace blockcache {
 
 bool DiskStateHealthChecker::Start() {
   std::unique_lock<std::shared_mutex> w(rw_lock_);
@@ -74,5 +76,6 @@ void DiskStateHealthChecker::RunCheck() {
   timer_->Add([this] { RunCheck(); }, FLAGS_disk_check_duration_millsecond);
 }
 
+}  // namespace blockcache
 }  // namespace client
 }  // namespace curvefs

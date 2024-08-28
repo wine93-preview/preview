@@ -40,7 +40,6 @@
 #include "src/common/concurrent/concurrent.h"
 #include "src/common/string_util.h"
 
-
 namespace curvefs {
 namespace client {
 namespace warmup {
@@ -497,7 +496,7 @@ void WarmupManagerS3Impl::WarmUpAllObjs(
 
             LOG(WARNING) << "Get Object failed, key: " << context->key
                          << ", offset: " << context->offset;
-            s3Adaptor_->GetS3Client()->DownloadAsync(context);
+            // s3Adaptor_->GetS3Client()->DownloadAsync(context);
         };
 
     pendingReq.fetch_add(prefetchObjs.size(), std::memory_order_seq_cst);
@@ -509,15 +508,15 @@ void WarmupManagerS3Impl::WarmUpAllObjs(
             uint64_t readLen = iter.second;
             {
                 ReadLockGuard lock(inode2ProgressMutex_);
-                auto iterProgress = FindWarmupProgressByKeyLocked(key);
-                if (iterProgress->second.GetStorageType() ==
-                        curvefs::client::common::WarmupStorageType::
-                            kWarmupStorageTypeDisk &&
-                    s3Adaptor_->GetDiskCacheManager()->IsCached(name)) {
-                    // storage in disk and has cached
-                    pendingReq.fetch_sub(1);
-                    continue;
-                }
+                //auto iterProgress = FindWarmupProgressByKeyLocked(key);
+                //if (iterProgress->second.GetStorageType() ==
+                //        curvefs::client::common::WarmupStorageType::
+                //            kWarmupStorageTypeDisk &&
+                //    s3Adaptor_->GetDiskCacheManager()->IsCached(name)) {
+                //    // storage in disk and has cached
+                //    pendingReq.fetch_sub(1);
+                //    continue;
+                //}
             }
             char *cacheS3 = new char[readLen];
             memset(cacheS3, 0, readLen);
@@ -528,7 +527,7 @@ void WarmupManagerS3Impl::WarmUpAllObjs(
             context->len = readLen;
             context->cb = cb;
             context->retry = 0;
-            s3Adaptor_->GetS3Client()->DownloadAsync(context);
+            //s3Adaptor_->GetS3Client()->DownloadAsync(context);
         }
         if (pendingReq.load())
             cond.Wait();
@@ -690,13 +689,13 @@ void WarmupManagerS3Impl::PutObjectToCache(
     iter->second.FinishedPlusOne();
     switch (iter->second.GetStorageType()) {
     case curvefs::client::common::WarmupStorageType::kWarmupStorageTypeDisk:
-        ret = s3Adaptor_->GetDiskCacheManager()->WriteReadDirect(
-            context->key, context->buf, context->len);
-        if (ret < 0) {
-            LOG_EVERY_SECOND(INFO)
-                << "write read directly failed, key: " << context->key;
-        }
-        delete[] context->buf;
+        //ret = s3Adaptor_->GetDiskCacheManager()->WriteReadDirect(
+        //    context->key, context->buf, context->len);
+        //if (ret < 0) {
+        //    LOG_EVERY_SECOND(INFO)
+        //        << "write read directly failed, key: " << context->key;
+        //}
+        //delete[] context->buf;
         break;
     case curvefs::client::common::WarmupStorageType::kWarmupStorageTypeKvClient:
         if (kvClientManager_ != nullptr) {

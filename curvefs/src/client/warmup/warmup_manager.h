@@ -49,6 +49,7 @@
 #include "curvefs/src/client/s3/client_s3_cache_manager.h"
 #include "src/common/concurrent/concurrent.h"
 #include "src/common/concurrent/rw_lock.h"
+#include "src/common/s3_adapter.h"
 #include "curvefs/src/common/task_thread_pool.h"
 #include "curvefs/src/client/metric/client_metric.h"
 
@@ -57,6 +58,7 @@ namespace client {
 namespace warmup {
 
 using common::FuseClientOption;
+using ::curve::common::GetObjectAsyncContext;
 
 using ThreadPool = curvefs::common::TaskThreadPool2<bthread::Mutex,
                                                     bthread::ConditionVariable>;

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CURVEFS_SRC_CLIENT_DISK_STATE_HEALTH_CHECKER_H_
-#define CURVEFS_SRC_CLIENT_DISK_STATE_HEALTH_CHECKER_H_
+#ifndef CURVEFS_SRC_CLIENT_BLOCK_CACHE_DISK_STATE_HEALTH_CHECKER_H_
+#define CURVEFS_SRC_CLIENT_BLOCK_CACHE_DISK_STATE_HEALTH_CHECKER_H_
 
 #include <memory>
 #include <shared_mutex>
@@ -25,6 +25,7 @@ DECLARE_int32(disk_check_duration_millsecond);
 
 namespace curvefs {
 namespace client {
+namespace blockcache {
 
 class DiskStateHealthChecker {
  public:
@@ -48,7 +49,8 @@ class DiskStateHealthChecker {
   std::unique_ptr<base::TimerImpl> timer_;
 };
 
+}  // namespace blockcache
 }  // namespace client
 }  // namespace curvefs
 
-#endif  // CURVEFS_SRC_CLIENT_DISK_STATE_HEALTH_CHECKER_H_
+#endif  // CURVEFS_SRC_CLIENT_BLOCK_CACHE_DISK_STATE_HEALTH_CHECKER_H_

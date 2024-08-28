@@ -28,8 +28,6 @@
 #include <vector>
 #include <set>
 
-#include "curvefs/src/client/s3/disk_cache_write.h"
-
 namespace curvefs {
 namespace client {
 

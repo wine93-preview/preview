@@ -20,6 +20,7 @@
 namespace curvefs {
 
 namespace client {
+namespace blockcache {
 
 class DiskStateMachineTest : public ::testing::Test {
  public:
@@ -100,6 +101,7 @@ TEST_F(DiskStateMachineTest, Unstable2Normal) {
   EXPECT_TRUE(disk_state_machine.Stop());
 }
 
+}  // namespace blockcache
 }  // namespace client
 
 }  // namespace curvefs

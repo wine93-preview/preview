@@ -38,6 +38,7 @@
 
 namespace curvefs {
 namespace base {
+namespace cache {
 
 class Cache;
 
@@ -114,6 +115,7 @@ class Cache {
   virtual size_t TotalCharge() const = 0;
 };
 
+}  // namespace cache
 }  // namespace base
 }  // namespace curvefs
 

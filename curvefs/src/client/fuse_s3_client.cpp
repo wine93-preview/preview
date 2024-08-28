@@ -25,6 +25,8 @@
 #include <memory>
 #include <vector>
 
+#include "curvefs/src/client/block_cache/block_cache.h"
+#include "curvefs/src/client/block_cache/s3_client.h"
 #include "curvefs/src/client/filesystem/xattr.h"
 #include "curvefs/src/client/kvclient/memcache_client.h"
 
@@ -47,6 +49,8 @@ using curvefs::client::common::FLAGS_supportKVcache;
 using ::curvefs::client::filesystem::XATTR_DIR_FBYTES;
 using curvefs::mds::topology::MemcacheClusterInfo;
 using curvefs::mds::topology::MemcacheServerInfo;
+using ::curvefs::client::blockcache::S3ClientImpl;
+using ::curvefs::client::blockcache::BlockCacheImpl;
 
 CURVEFS_ERROR FuseS3Client::Init(const FuseClientOption& option) {
   FuseClientOption opt(option);
@@ -67,14 +71,13 @@ CURVEFS_ERROR FuseS3Client::Init(const FuseClientOption& option) {
   ::curvefs::client::common::S3Info2FsS3Option(s3Info, &fsS3Option);
   SetFuseClientS3Option(&opt, fsS3Option);
 
-  auto s3Client = std::make_shared<S3ClientImpl>();
-  s3Client->Init(opt.s3Opt.s3AdaptrOpt);
+  S3ClientImpl::GetInstance().Init(opt.s3Opt.s3AdaptrOpt);
 
   const uint64_t writeCacheMaxByte =
       opt.s3Opt.s3ClientAdaptorOpt.writeCacheMaxByte;
   if (writeCacheMaxByte < MIN_WRITE_CACHE_SIZE) {
-    LOG(ERROR) << "writeCacheMaxByte is too small" << ", at least "
-               << MIN_WRITE_CACHE_SIZE
+    LOG(ERROR) << "writeCacheMaxByte is too small"
+               << ", at least " << MIN_WRITE_CACHE_SIZE
                << " (8MB)"
                   ", writeCacheMaxByte = "
                << writeCacheMaxByte;
@@ -85,27 +88,11 @@ CURVEFS_ERROR FuseS3Client::Init(const FuseClientOption& option) {
       dynamic_cast<S3ClientAdaptorImpl*>(s3Adaptor_.get()),
       opt.s3Opt.s3ClientAdaptorOpt.readCacheMaxByte, writeCacheMaxByte,
       opt.s3Opt.s3ClientAdaptorOpt.readCacheThreads, kvClientManager_);
-  if (opt.s3Opt.s3ClientAdaptorOpt.diskCacheOpt.diskCacheType !=
-      DiskCacheType::Disable) {
-    auto s3DiskCacheClient = std::make_shared<S3ClientImpl>();
-    s3DiskCacheClient->Init(opt.s3Opt.s3AdaptrOpt);
-    auto wrapper = std::make_shared<PosixWrapper>();
-    auto diskCacheRead = std::make_shared<DiskCacheRead>();
-    auto diskCacheWrite = std::make_shared<DiskCacheWrite>();
-    auto diskCacheManager = std::make_shared<DiskCacheManager>(
-        wrapper, diskCacheWrite, diskCacheRead);
-    auto diskCacheManagerImpl = std::make_shared<DiskCacheManagerImpl>(
-        diskCacheManager, s3DiskCacheClient);
-    ret = s3Adaptor_->Init(opt.s3Opt.s3ClientAdaptorOpt, s3Client,
-                           inodeManager_, mdsClient_, fsCacheManager,
-                           diskCacheManagerImpl, kvClientManager_, true);
-  } else {
-    ret = s3Adaptor_->Init(opt.s3Opt.s3ClientAdaptorOpt, s3Client,
-                           inodeManager_, mdsClient_, fsCacheManager, nullptr,
-                           kvClientManager_, true);
-  }
 
-  return ret;
+  auto bcache = std::make_shared<BlockCacheImpl>(option.blockCacheOption);
+  return s3Adaptor_->Init(opt.s3Opt.s3ClientAdaptorOpt, inodeManager_,
+                          mdsClient_, fsCacheManager, bcache, kvClientManager_,
+                          true);
 }
 
 bool FuseS3Client::InitKVCache(const KVClientManagerOpt& opt) {
@@ -180,7 +167,7 @@ CURVEFS_ERROR FuseS3Client::FuseOpWrite(fuse_req_t req, fuse_ino_t ino,
     uint64_t duration = butil::cpuwide_time_us() - start;
     fsMetric_->userWrite.latency << duration;
     // fsMetric_->userWriteIoSize.set_value(wRet);
-    fsMetric_->userWriteIoSizeSecond << wRet;
+    // fsMetric_->userWriteIoSizeSecond << wRet;
   }
 
   std::shared_ptr<InodeWrapper> inodeWrapper;
@@ -217,7 +204,8 @@ CURVEFS_ERROR FuseS3Client::FuseOpWrite(fuse_req_t req, fuse_ino_t ino,
     for (const auto& it : inode->parent()) {
       auto tret = xattrManager_->UpdateParentInodeXattr(it, xattr, true);
       if (tret != CURVEFS_ERROR::OK) {
-        LOG(ERROR) << "UpdateParentInodeXattr failed," << " inodeId = " << it
+        LOG(ERROR) << "UpdateParentInodeXattr failed,"
+                   << " inodeId = " << it
                    << ", xattr = " << xattr.DebugString();
       }
     }
@@ -302,7 +290,7 @@ CURVEFS_ERROR FuseS3Client::FuseOpRead(fuse_req_t req, fuse_ino_t ino,
     uint64_t duration = butil::cpuwide_time_us() - start;
     fsMetric_->userRead.latency << duration;
     // fsMetric_->userWriteIoSize.set_value(wRet);
-    fsMetric_->userReadIoSizeSecond << rRet;
+    // fsMetric_->userReadIoSizeSecond << rRet;
   }
 
   ::curve::common::UniqueLock lgGuard = inodeWrapper->GetUniqueLock();
@@ -350,6 +338,10 @@ CURVEFS_ERROR FuseS3Client::FuseOpMkNod(fuse_req_t req, fuse_ino_t parent,
   InodeAttr attr;
   inode->GetInodeAttr(&attr);
   *entryOut = EntryOut(attr);
+
+  auto entryWatcher = fs_->BorrowMember().entryWatcher;
+  entryWatcher->Remeber(attr, name);
+
   return CURVEFS_ERROR::OK;
 }
 
@@ -409,8 +401,10 @@ CURVEFS_ERROR FuseS3Client::FuseOpFlush(fuse_req_t req, fuse_ino_t ino,
 
   if (ino == STATSINODEID) return ret;
 
+  auto entryWatcher = fs_->BorrowMember().entryWatcher;
+
   // if enableCto, flush all write cache both in memory cache and disk cache
-  if (FLAGS_enableCto) {
+  if (FLAGS_enableCto && !entryWatcher->IsNocto(ino)) {
     ret = s3Adaptor_->FlushAllCache(ino);
     if (ret != CURVEFS_ERROR::OK) {
       LOG(ERROR) << "FuseOpFlush, flush all cache fail, ret = " << ret

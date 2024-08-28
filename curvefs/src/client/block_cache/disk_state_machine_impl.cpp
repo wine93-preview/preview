@@ -32,6 +32,7 @@ DEFINE_int32(unstable2down_second, 30 * 60,
 
 namespace curvefs {
 namespace client {
+namespace blockcache {
 
 void NormalDiskState::IOErr() {
   io_error_count_.fetch_add(1);
@@ -172,5 +173,6 @@ void DiskStateMachineImpl::ProcessEvent(DiskStateEvent event) {
   }
 }
 
+}  // namespace blockcache
 }  // namespace client
 }  // namespace curvefs

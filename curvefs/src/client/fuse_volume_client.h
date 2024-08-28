@@ -41,9 +41,9 @@ using ::curvefs::volume::SpaceManager;
 
 class FuseVolumeClient : public FuseClient {
  public:
-    FuseVolumeClient()
-        : FuseClient(),
-          blockDeviceClient_(std::make_shared<BlockDeviceClientImpl>()) {}
+    FuseVolumeClient() {}
+         // : FuseClient(),
+         //   blockDeviceClient_(std::make_shared<BlockDeviceClientImpl>()) {}
 
     // for UNIT_TEST
     FuseVolumeClient(

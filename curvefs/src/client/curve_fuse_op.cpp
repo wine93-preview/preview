@@ -47,6 +47,7 @@
 #include "curvefs/src/client/filesystem/access_log.h"
 #include "curvefs/src/client/filesystem/metric.h"
 #include "curvefs/src/client/filesystem/xattr.h"
+#include "curvefs/src/client/block_cache/log.h"
 
 using ::curve::common::Configuration;
 using ::curvefs::client::CURVEFS_ERROR;
@@ -70,6 +71,7 @@ using ::curvefs::client::filesystem::StrEntry;
 using ::curvefs::client::filesystem::StrAttr;
 using ::curvefs::client::filesystem::StrMode;
 using ::curvefs::client::filesystem::IsWarmupXAttr;
+using ::curvefs::client::blockcache::InitBlockCacheLog;
 
 using ::curvefs::common::FLAGS_vlog_level;
 
@@ -145,7 +147,8 @@ int InitLog(const char *confPath, const char *argv0) {
     // initialize logging module
     google::InitGoogleLogging(argv0);
 
-    bool succ = InitAccessLog(FLAGS_log_dir);
+    bool succ = InitAccessLog(FLAGS_log_dir) &&
+                InitBlockCacheLog(FLAGS_log_dir);
     if (!succ) {
         return -1;
     }
@@ -189,7 +192,7 @@ int InitFuseClient(const struct MountOption *mountOption) {
     } else if (fsTypeStr == "s3") {
         g_ClientInstance = new FuseS3Client();
     } else if (fsTypeStr == "volume") {
-        g_ClientInstance = new FuseVolumeClient();
+        // g_ClientInstance = new FuseVolumeClient();
     } else {
         LOG(ERROR) << "unknown fstype! fstype is " << fsTypeStr;
         return -1;
