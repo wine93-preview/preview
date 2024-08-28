@@ -27,8 +27,10 @@
 #include <string>
 #include <vector>
 
-#include "src/common/gflags_helper.h"
 #include "src/common/string_util.h"
+#include "src/common/gflags_helper.h"
+#include "curvefs/src/base/math.h"
+#include "curvefs/src/base/string.h"
 
 namespace brpc {
 DECLARE_int32(defer_close_second);
@@ -46,6 +48,11 @@ DECLARE_bool(useFakeS3);
 namespace curvefs {
 namespace client {
 namespace common {
+
+using ::curvefs::base::math::kMiB;
+using ::curvefs::base::string::StrSplit;
+using ::curvefs::base::string::Str2Int;
+
 static bool pass_bool(const char *, bool) { return true; }
 DEFINE_bool(enableCto, true, "acheieve cto consistency");
 DEFINE_bool(useFakeS3, false,
@@ -53,6 +60,8 @@ DEFINE_bool(useFakeS3, false,
 DEFINE_bool(supportKVcache, false, "use kvcache to speed up sharing");
 DEFINE_bool(access_logging, true, "enable access log");
 DEFINE_validator(access_logging, &pass_bool);
+DEFINE_bool(block_cache_logging, true, "enable block cache log");
+DEFINE_validator(block_cache_logging, &pass_bool);
 
 /**
  * use curl -L fuseclient:port/flags/fuseClientAvgWriteBytes?setvalue=true
@@ -168,45 +177,6 @@ void InitBlockDeviceOption(Configuration *conf,
     conf->GetValueFatalIfFail("bdev.confPath", &bdevOpt->configPath);
 }
 
-void InitDiskCacheOption(Configuration *conf,
-                         DiskCacheOption *diskCacheOption) {
-    uint32_t diskCacheType;
-    conf->GetValueFatalIfFail("diskCache.diskCacheType",
-                              &diskCacheType);
-    diskCacheOption->diskCacheType = (DiskCacheType)diskCacheType;
-    conf->GetValueFatalIfFail("diskCache.forceFlush",
-                              &diskCacheOption->forceFlush);
-    conf->GetValueFatalIfFail("diskCache.cacheDir", &diskCacheOption->cacheDir);
-    conf->GetValueFatalIfFail("diskCache.trimCheckIntervalSec",
-                              &diskCacheOption->trimCheckIntervalSec);
-    conf->GetValueFatalIfFail("diskCache.asyncLoadPeriodMs",
-                              &diskCacheOption->asyncLoadPeriodMs);
-    conf->GetValueFatalIfFail("diskCache.fullRatio",
-                              &diskCacheOption->fullRatio);
-    conf->GetValueFatalIfFail("diskCache.safeRatio",
-                              &diskCacheOption->safeRatio);
-    conf->GetValueFatalIfFail("diskCache.maxUsableSpaceBytes",
-                              &diskCacheOption->maxUsableSpaceBytes);
-    conf->GetValueFatalIfFail("diskCache.maxFileNums",
-                              &diskCacheOption->maxFileNums);
-    conf->GetValueFatalIfFail("diskCache.cmdTimeoutSec",
-                              &diskCacheOption->cmdTimeoutSec);
-    conf->GetValueFatalIfFail("diskCache.threads",
-                              &diskCacheOption->threads);
-    conf->GetValueFatalIfFail("diskCache.avgFlushBytes",
-                              &diskCacheOption->avgFlushBytes);
-    conf->GetValueFatalIfFail("diskCache.burstFlushBytes",
-                              &diskCacheOption->burstFlushBytes);
-    conf->GetValueFatalIfFail("diskCache.burstSecs",
-                              &diskCacheOption->burstSecs);
-    conf->GetValueFatalIfFail("diskCache.avgFlushIops",
-                              &diskCacheOption->avgFlushIops);
-    conf->GetValueFatalIfFail("diskCache.avgReadFileBytes",
-                              &diskCacheOption->avgReadFileBytes);
-    conf->GetValueFatalIfFail("diskCache.avgReadFileIops",
-                              &diskCacheOption->avgReadFileIops);
-}
-
 void InitS3Option(Configuration *conf, S3Option *s3Opt) {
     conf->GetValueFatalIfFail("s3.fakeS3", &FLAGS_useFakeS3);
     conf->GetValueFatalIfFail("s3.pageSize",
@@ -238,7 +208,7 @@ void InitS3Option(Configuration *conf, S3Option *s3Opt) {
                               &s3Opt->s3ClientAdaptorOpt.readRetryIntervalMs);
     ::curve::common::InitS3AdaptorOptionExceptS3InfoOption(conf,
                                                            &s3Opt->s3AdaptrOpt);
-    InitDiskCacheOption(conf, &s3Opt->s3ClientAdaptorOpt.diskCacheOpt);
+    //InitDiskCacheOption(conf, &s3Opt->s3ClientAdaptorOpt.diskCacheOpt);
 }
 
 void InitVolumeOption(Configuration *conf, VolumeOption *volumeOpt) {
@@ -298,6 +268,7 @@ void InitKVClientManagerOpt(Configuration *conf,
 void InitFileSystemOption(Configuration* c, FileSystemOption* option) {
     c->GetValueFatalIfFail("fs.cto", &option->cto);
     c->GetValueFatalIfFail("fs.cto", &FLAGS_enableCto);
+    c->GetValueFatalIfFail("fs.noctoSuffix", &option->noctoSuffix);
     c->GetValueFatalIfFail("fs.disableXAttr", &option->disableXAttr);
     c->GetValueFatalIfFail("fs.maxNameLength", &option->maxNameLength);
     c->GetValueFatalIfFail("fs.accessLogging", &FLAGS_access_logging);
@@ -344,6 +315,57 @@ void InitFileSystemOption(Configuration* c, FileSystemOption* option) {
     }
 }
 
+namespace {
+
+void SplitDiskCacheOption(DiskCacheOption option,
+                          std::vector<DiskCacheOption>* options) {
+    std::vector<std::string> dirs = StrSplit(option.cacheDir, ";");
+    for (int i = 0; i < dirs.size(); i++) {
+        uint64_t cacheSize = option.cacheSize;
+        std::vector<std::string> items = StrSplit(dirs[i], ":");
+        if (items.size() > 2 ||
+            (items.size() == 2 && !Str2Int(items[1], &cacheSize))) {
+            CHECK(false) << "Invalid cache dir: " << dirs[i];
+        }
+
+        DiskCacheOption o = option;
+        o.index = i;
+        o.cacheDir = items[0];
+        o.cacheSize = cacheSize;
+        options->emplace_back(o);
+    }
+}
+
+}
+
+void InitBlockCacheOption(Configuration* c, BlockCacheOption* option) {
+    c->GetValueFatalIfFail("blockCache.stage", &option->stage);
+    c->GetValueFatalIfFail("blockCache.logging", &FLAGS_block_cache_logging);
+    c->GetValueFatalIfFail("blockCache.cacheStore", &option->cacheStore);
+    if (option->cacheStore == "none") {
+        return;
+    } else if (option->cacheStore == "disk") {
+        // do nothing
+    } else {
+        CHECK(false) << "Only support disk or none cache store.";
+    }
+
+    {  // disk cache option
+        DiskCacheOption o;
+        c->GetValueFatalIfFail("blockCache.diskCache.cacheDir",
+                               &o.cacheDir);
+        c->GetValueFatalIfFail("blockCache.diskCache.cacheSize",
+                               &o.cacheSize);
+        c->GetValueFatalIfFail("blockCache.diskCache.freeSpaceRatio",
+                               &o.freeSpaceRatio);
+        c->GetValueFatalIfFail("blockCache.diskCache.cacheExpire",
+                               &o.cacheExpire);
+
+        o.cacheSize = o.cacheSize * kMiB;
+        SplitDiskCacheOption(o, &option->diskCacheOptions);
+    }
+}
+
 void SetBrpcOpt(Configuration *conf) {
     curve::common::GflagsLoadValueFromConfIfCmdNotSet dummy;
     dummy.Load(conf, "defer_close_second", "rpc.defer.close.second",
@@ -365,6 +387,7 @@ void InitFuseClientOption(Configuration *conf, FuseClientOption *clientOption) {
     InitRefreshDataOpt(conf, &clientOption->refreshDataOption);
     InitKVClientManagerOpt(conf, &clientOption->kvClientManagerOpt);
     InitFileSystemOption(conf, &clientOption->fileSystemOption);
+    InitBlockCacheOption(conf, &clientOption->blockCacheOption);
 
     conf->GetValueFatalIfFail("fuseClient.listDentryLimit",
                               &clientOption->listDentryLimit);

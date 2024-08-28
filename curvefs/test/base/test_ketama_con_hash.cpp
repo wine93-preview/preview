@@ -25,6 +25,7 @@
 namespace curvefs {
 
 namespace base {
+namespace hash {
 
 class KetamaConHashTest : public ::testing::Test {
  public:
@@ -230,6 +231,6 @@ TEST_F(KetamaConHashTest, IpDistributeTest) {
   }
 }
 
+}  // namespace hash
 }  // namespace base
-
 }  // namespace curvefs

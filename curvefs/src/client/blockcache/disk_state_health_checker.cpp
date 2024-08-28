@@ -12,18 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "curvefs/src/client/block_cache/disk_state_health_checker.h"
+#include "curvefs/src/client/blockcache/disk_state_health_checker.h"
 
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
 
+#include "absl/cleanup/cleanup.h"
+#include "curvefs/src/base/filepath.h"
 #include "curvefs/src/base/timer_impl.h"
 
 DEFINE_int32(disk_check_duration_millsecond, 1 * 1000,
              "disk health check duration in millsecond");
+
 namespace curvefs {
 namespace client {
+namespace blockcache {
+
+using ::curvefs::base::filepath::Join;
 
 bool DiskStateHealthChecker::Start() {
   std::unique_lock<std::shared_mutex> w(rw_lock_);
@@ -65,14 +71,23 @@ void DiskStateHealthChecker::RunCheck() {
     }
   }
 
-  // TODO: check disk state, wait for filesystem interface
-  //   if check success
-  //       state_machine_.IOSucc()
-  //   else
-  //       state_machine_.IOErr()
+  // The easiest way to probe disk state
+  {
+    std::unique_ptr<char[]> buffer(new (std::nothrow) char[8192]);
+    std::string path = Join({layout_->GetProbeDir(), "probe.tmp"});
+    auto defer = ::absl::MakeCleanup([path, this]() { fs_->RemoveFile(path); });
+    fs_->WriteFile(path, buffer.get(), sizeof(buffer));
+  }
+
+  // The disk maybe broken
+  {
+    bool find = fs_->FileExists(layout_->GetMetaPath());
+    meta_file_exist_.store(find, std::memory_order_release);
+  }
 
   timer_->Add([this] { RunCheck(); }, FLAGS_disk_check_duration_millsecond);
 }
 
+}  // namespace blockcache
 }  // namespace client
 }  // namespace curvefs

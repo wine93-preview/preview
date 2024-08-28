@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CURVEFS_SRC_CLIENT_DISK_STATE_MACHINE_IMPL_H_
-#define CURVEFS_SRC_CLIENT_DISK_STATE_MACHINE_IMPL_H_
+#ifndef CURVEFS_SRC_CLIENT_BLOCKCACHE_DISK_STATE_MACHINE_IMPL_H_
+#define CURVEFS_SRC_CLIENT_BLOCKCACHE_DISK_STATE_MACHINE_IMPL_H_
 
 #include <memory>
 
 #include "bthread/execution_queue.h"
 #include "curvefs/src/base/timer_impl.h"
-#include "curvefs/src/client/block_cache/disk_state_machine.h"
+#include "curvefs/src/client/blockcache/disk_state_machine.h"
 #include "src/common/concurrent/rw_lock.h"
 
 DECLARE_int32(tick_duration_second);
@@ -29,6 +29,7 @@ DECLARE_int32(unstable2normal_io_succ_num);
 DECLARE_int32(unstable2down_second);
 namespace curvefs {
 namespace client {
+namespace blockcache {
 
 using namespace std::chrono;
 
@@ -37,7 +38,7 @@ class DiskStateMachine;
 // clang-format off
 
 // Disk State Machine
-// 
+//
 // +---------------+                     +-----------------+                       +---------------------+
 // |               +--------------------->                 |                       |                     |
 // |    Normal     |                     |     Unstable    +----------------------->        Down         |
@@ -54,11 +55,11 @@ class BaseDiskState {
 
   virtual ~BaseDiskState() = default;
 
-  virtual void IOSucc() {};
+  virtual void IOSucc(){};
 
-  virtual void IOErr() {};
+  virtual void IOErr(){};
 
-  virtual void Tick() {};
+  virtual void Tick(){};
 
   virtual DiskState GetDiskState() const { return kDiskStateUnknown; }
 
@@ -158,7 +159,8 @@ class DiskStateMachineImpl final : public DiskStateMachine {
   std::unique_ptr<base::TimerImpl> timer_;
 };
 
+}  // namespace blockcache
 }  // namespace client
 }  // namespace curvefs
 
-#endif  // CURVEFS_SRC_CLIENT_DISK_STATE_MACHINE_IMPL_H_
+#endif  // CURVEFS_SRC_CLIENT_BLOCKCACHE_DISK_STATE_MACHINE_IMPL_H_

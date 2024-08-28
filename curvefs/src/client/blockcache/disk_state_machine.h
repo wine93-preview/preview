@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CURVEFS_SRC_CLIENT_DISK_STATE_MACHINE_H_
-#define CURVEFS_SRC_CLIENT_DISK_STATE_MACHINE_H_
+#ifndef CURVEFS_SRC_CLIENT_BLOCKCACHE_DISK_STATE_MACHINE_H_
+#define CURVEFS_SRC_CLIENT_BLOCKCACHE_DISK_STATE_MACHINE_H_
 
 #include <cstdint>
 #include <string>
@@ -21,6 +21,7 @@
 #include "glog/logging.h"
 namespace curvefs {
 namespace client {
+namespace blockcache {
 
 enum DiskState : uint8_t {
   kDiskStateUnknown = 0,
@@ -43,6 +44,7 @@ inline std::string DiskStateToString(DiskState state) {
       CHECK(false) << "invalid disk state: " << static_cast<int>(state);
   }
 }
+
 enum DiskStateEvent : uint8_t {
   kDiskStateEventUnkown = 0,
   kDiskStateEventNormal = 1,
@@ -84,7 +86,8 @@ class DiskStateMachine {
   virtual void OnEvent(DiskStateEvent event) = 0;
 };
 
+}  // namespace blockcache
 }  // namespace client
 }  // namespace curvefs
 
-#endif  // CURVEFS_SRC_CLIENT_DISK_STATE_MACHINE_H_
+#endif  // CURVEFS_SRC_CLIENT_BLOCKCACHE_DISK_STATE_MACHINE_H_

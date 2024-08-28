@@ -126,9 +126,12 @@ using common::FLAGS_fuseClientAvgReadBytes;
 using common::FLAGS_fuseClientBurstReadBytes;
 using common::FLAGS_fuseClientBurstReadBytesSecs;
 
-static void on_throttle_timer(void* arg) {
-  FuseClient* fuseClient = reinterpret_cast<FuseClient*>(arg);
-  fuseClient->InitQosParam();
+using ::curve::common::ReadWriteThrottleParams;
+using ::curve::common::ThrottleParams;
+
+static void on_throttle_timer(void *arg) {
+    FuseClient *fuseClient = reinterpret_cast<FuseClient *>(arg);
+    fuseClient->InitQosParam();
 }
 
 CURVEFS_ERROR FuseClient::Init(const FuseClientOption& option) {
@@ -275,9 +278,16 @@ CURVEFS_ERROR FuseClient::FuseOpLookup(fuse_req_t req, fuse_ino_t parent,
     *entryOut = EntryOut(attr);
     return CURVEFS_ERROR::OK;
   }
+
+  auto entryWatcher = fs_->BorrowMember().entryWatcher;
   CURVEFS_ERROR rc = fs_->Lookup(req, parent, name, entryOut);
-  if (rc != CURVEFS_ERROR::OK && rc != CURVEFS_ERROR::NOTEXIST) {
-    LOG(ERROR) << "Lookup() failed, retCode = " << rc << ", parent = " << parent
+  if (rc == CURVEFS_ERROR::OK) {
+    entryWatcher->Remeber(entryOut->attr, name);
+  } else if (rc == CURVEFS_ERROR::NOTEXIST) {
+    // do nothing
+  } else {
+    LOG(ERROR) << "Lookup() failed, retCode = " << rc
+               << ", parent = " << parent
                << ", name = " << name;
   }
   return rc;
@@ -1352,6 +1362,8 @@ CURVEFS_ERROR FuseClient::FuseOpLink(fuse_req_t req, fuse_ino_t ino,
   }
 
   inodeWrapper->GetInodeAttr(&entryOut->attr);
+  auto entryWatcher = fs_->BorrowMember().entryWatcher;
+  entryWatcher->Forget(ino);
   return ret;
 }
 
