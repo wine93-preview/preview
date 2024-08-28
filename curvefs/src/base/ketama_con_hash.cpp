@@ -26,6 +26,7 @@
 
 namespace curvefs {
 namespace base {
+namespace hash {
 
 // 40 hashes, 4 numbers per hash = 160 points per node
 const static uint32_t kHashNumPerNode = 40;
@@ -167,6 +168,6 @@ void KetamaConHash::CreateContinuum() {
           << total_node_num << " nodes";
 }
 
+}  // namespace hash
 }  // namespace base
-
 }  // namespace curvefs

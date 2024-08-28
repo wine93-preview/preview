@@ -21,6 +21,7 @@
 
 namespace curvefs {
 namespace base {
+namespace hash {
 
 struct ConNode {
   std::string key;
@@ -66,8 +67,8 @@ class ConHash {
   virtual void Dump() = 0;
 };
 
+}  // namespace hash
 }  // namespace base
-
 }  // namespace curvefs
 
 #endif  // CURVEFS_SRC_BASE_CON_HASH_H

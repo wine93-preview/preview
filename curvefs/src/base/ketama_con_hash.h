@@ -22,6 +22,7 @@
 
 namespace curvefs {
 namespace base {
+namespace hash {
 
 class KetamaConHash : public ConHash {
  public:
@@ -64,8 +65,8 @@ class KetamaConHash : public ConHash {
   std::vector<std::pair<uint32_t, std::string>> continuum_;
 };
 
+}  // namespace hash
 }  // namespace base
-
 }  // namespace curvefs
 
 #endif  // CURVEFS_SRC_BASE_KETAMA_CON_HASH_H
