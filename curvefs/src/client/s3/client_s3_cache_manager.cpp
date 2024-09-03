@@ -32,6 +32,8 @@
 #include "curvefs/src/common/s3util.h"
 #include "curvefs/src/client/metric/client_metric.h"
 #include "curvefs/src/client/kvclient/kvclient_manager.h"
+#include "curvefs/src/client/blockcache/error.h"
+#include "curvefs/src/client/blockcache/s3_client.h"
 
 namespace curvefs {
 namespace client {
@@ -47,6 +49,9 @@ static S3MultiManagerMetric *g_s3MultiManagerMetric =
 
 namespace curvefs {
 namespace client {
+
+using ::curvefs::client::blockcache::BCACHE_ERROR;
+using ::curvefs::client::blockcache::S3ClientImpl;
 
 void FsCacheManager::DataCacheNumInc() {
     g_s3MultiManagerMetric->writeDataCacheNum << 1;
@@ -475,22 +480,21 @@ int FileCacheManager::Read(uint64_t inodeId, uint64_t offset, uint64_t length,
     return actualReadLen;
 }
 
-bool FileCacheManager::ReadKVRequestFromLocalCache(const std::string &name,
+bool FileCacheManager::ReadKVRequestFromLocalCache(const BlockKey& key,
                                                    char *databuf,
                                                    uint64_t offset,
                                                    uint64_t len) {
     uint64_t start = butil::cpuwide_time_us();
 
-    bool mayCached = s3ClientAdaptor_->HasDiskCache() &&
-                     s3ClientAdaptor_->GetDiskCacheManager()->IsCached(name);
-    if (!mayCached) {
+    auto blockCache = s3ClientAdaptor_->GetBlockCache();
+    if (!blockCache->IsCached(key)) {
         return false;
     }
 
-    if (0 > s3ClientAdaptor_->GetDiskCacheManager()->Read(name, databuf, offset,
-                                                          len)) {
-        LOG(WARNING) << "object " << name << " not cached in disk";
-        return false;
+    auto rc = blockCache->Range(key, offset, len, databuf, false);
+    if (rc != BCACHE_ERROR::OK) {
+      LOG(WARNING) << "Object " << key.Filename() << " not cached in disk";
+      return false;
     }
 
     if (s3ClientAdaptor_->s3Metric_) {
@@ -525,9 +529,15 @@ bool FileCacheManager::ReadKVRequestFromS3(const std::string &name,
                                            char *databuf, uint64_t offset,
                                            uint64_t length, int *ret) {
     uint64_t start = butil::cpuwide_time_us();
+
+    {
+      auto rc = S3ClientImpl::GetInstance().Get();
+
+    }
+
     *ret = s3ClientAdaptor_->GetS3Client()->Download(name, databuf, offset,
                                                      length);
-    if (*ret < 0) {
+    if (rc != BCACHE_ERROR::OK) {
         LOG(ERROR) << "object " << name << " read from s3 fail, ret = " << *ret;
         return false;
     }
@@ -546,7 +556,7 @@ FileCacheManager::ReadKVRequest(const std::vector<S3ReadRequest> &kvRequests,
     absl::BlockingCounter counter(kvRequests.size());
     std::once_flag cancelFlag;
     std::atomic<bool> isCanceled{false};
-    std::atomic<int> retCode{0};
+    std::atomic<BCACHE_ERROR> retCode{ BCACHE_ERROR::OK };
 
     for (const auto &req : kvRequests) {
         readTaskPool_->Enqueue([&]() {
@@ -568,7 +578,7 @@ void FileCacheManager::ProcessKVRequest(const S3ReadRequest &req, char *dataBuf,
                                         uint64_t fileLen,
                                         std::once_flag &cancelFlag,
                                         std::atomic<bool> &isCanceled,
-                                        std::atomic<int> &retCode) {
+                                        std::atomic<BCACHE_ERROR> &retCode) {
     VLOG(6) << "read from kv request " << req.DebugString();
     uint64_t chunkIndex = 0;
     uint64_t chunkPos = 0;
@@ -600,9 +610,9 @@ void FileCacheManager::ProcessKVRequest(const S3ReadRequest &req, char *dataBuf,
         currentReadLen =
             length + blockPos > blockSize ? blockSize - blockPos : length;
         assert(blockPos >= objectOffset);
-        std::string name = curvefs::common::s3util::GenObjName(
-            req.chunkId, blockIndex, req.compaction, req.fsId, req.inodeId,
-            objectPrefix);
+        BlockKey key(req.fsId, req.inodeId, req.chunkId,
+                     blockIndex, req.compaction);
+
         char *currentBuf = dataBuf + req.readOffset + readBufOffset;
 
         // read from localcache -> remotecache -> s3

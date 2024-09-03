@@ -31,10 +31,11 @@
 #include "absl/container/btree_map.h"
 #include "src/common/lru_cache.h"
 #include "src/common/concurrent/concurrent.h"
+#include "curvefs/src/base/time.h"
+#include "curvefs/src/base/message_queue.h"
 #include "curvefs/src/client/common/config.h"
 #include "curvefs/src/client/filesystem/meta.h"
 #include "curvefs/src/client/filesystem/metric.h"
-#include "curvefs/src/client/filesystem/message_queue.h"
 
 namespace curvefs {
 namespace client {
@@ -44,6 +45,8 @@ using ::curve::common::LRUCache;
 using ::curve::common::RWLock;
 using ::curve::common::ReadLockGuard;
 using ::curve::common::WriteLockGuard;
+using ::curvefs::base::queue::MessageQueue;
+using ::curvefs::base::time::TimeSpec;
 using ::curvefs::client::common::DirCacheOption;
 
 class DirEntryList {

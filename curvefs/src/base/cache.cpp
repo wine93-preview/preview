@@ -26,6 +26,7 @@
 
 namespace curvefs {
 namespace base {
+namespace cache {
 
 Cache::~Cache() = default;
 
@@ -484,5 +485,6 @@ class ShardedLRUCache : public Cache {
 
 Cache* NewLRUCache(size_t capacity) { return new ShardedLRUCache(capacity); }
 
+}  // namespace cache
 }  // namespace base
 }  // namespace curvefs

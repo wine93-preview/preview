@@ -38,6 +38,7 @@
 
 namespace curvefs {
 namespace base {
+namespace cache {
 
 class Cache;
 
@@ -75,7 +76,7 @@ class Cache {
 
   // If the cache has no mapping for "key", returns nullptr.
   //
-  // Else return a handle that corresponds to the mapping.  The caller
+  // Else return a handle that corresponds to the mapping. The caller
   // must call this->Release(handle) when the returned mapping is no
   // longer needed.
   virtual Handle* Lookup(const std::string_view& key) = 0;
@@ -114,6 +115,7 @@ class Cache {
   virtual size_t TotalCharge() const = 0;
 };
 
+}  // namespace cache
 }  // namespace base
 }  // namespace curvefs
 

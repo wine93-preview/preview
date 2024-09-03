@@ -23,6 +23,7 @@
 
 namespace curvefs {
 namespace base {
+namespace cache {
 
 inline uint32_t DecodeFixed32(const char* ptr) {
   const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
@@ -265,5 +266,6 @@ TEST_F(CacheTest, ZeroSizeCache) {
   ASSERT_EQ(-1, Lookup(1));
 }
 
+}  // namespace cache
 }  // namespace base
 }  // namespace curvefs

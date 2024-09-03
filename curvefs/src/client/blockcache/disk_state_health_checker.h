@@ -12,24 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CURVEFS_SRC_CLIENT_DISK_STATE_HEALTH_CHECKER_H_
-#define CURVEFS_SRC_CLIENT_DISK_STATE_HEALTH_CHECKER_H_
+#ifndef CURVEFS_SRC_CLIENT_BLOCKCACHE_DISK_STATE_HEALTH_CHECKER_H_
+#define CURVEFS_SRC_CLIENT_BLOCKCACHE_DISK_STATE_HEALTH_CHECKER_H_
 
+#include <functional>
 #include <memory>
 #include <shared_mutex>
 
 #include "curvefs/src/base/timer_impl.h"
-#include "curvefs/src/client/block_cache/disk_state_machine.h"
+#include "curvefs/src/client/blockcache/disk_cache_layout.h"
+#include "curvefs/src/client/blockcache/local_filesystem.h"
 
 DECLARE_int32(disk_check_duration_millsecond);
 
 namespace curvefs {
 namespace client {
+namespace blockcache {
 
 class DiskStateHealthChecker {
  public:
-  DiskStateHealthChecker(DiskStateMachine* state_machine)
-      : state_machine_(state_machine) {}
+  DiskStateHealthChecker(std::shared_ptr<DiskCacheLayout> layout,
+                         std::shared_ptr<LocalFileSystem> fs)
+      : layout_(layout), fs_(fs) {}
 
   virtual ~DiskStateHealthChecker() = default;
 
@@ -37,18 +41,27 @@ class DiskStateHealthChecker {
 
   virtual bool Stop();
 
+  virtual bool MetaFileExist();
+
  private:
   void RunCheck();
 
   std::shared_mutex rw_lock_;
   bool running_{false};
 
-  DiskStateMachine* state_machine_;
+  std::atomic<bool> meta_file_exist_{true};
+  std::shared_ptr<DiskCacheLayout> layout_;
+  std::shared_ptr<LocalFileSystem> fs_;
 
   std::unique_ptr<base::TimerImpl> timer_;
 };
 
+inline bool DiskStateHealthChecker::MetaFileExist() {
+  return meta_file_exist_.load(std::memory_order_relaxed)
+}
+
+}  // namespace blockcache
 }  // namespace client
 }  // namespace curvefs
 
-#endif  // CURVEFS_SRC_CLIENT_DISK_STATE_HEALTH_CHECKER_H_
+#endif  // CURVEFS_SRC_CLIENT_BLOCKCACHE_DISK_STATE_HEALTH_CHECKER_H_
