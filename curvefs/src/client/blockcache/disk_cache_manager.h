@@ -67,9 +67,9 @@ class DiskCacheManager {
 
   virtual void Stop();
 
-  virtual void Add(const CacheKey& key, const CacheValue& value);
+  virtual void Add(const BlockKey& key, const CacheValue& value);
 
-  virtual BCACHE_ERROR Get(const CacheKey& key, CacheValue* value);
+  virtual BCACHE_ERROR Get(const BlockKey& key, CacheValue* value);
 
   virtual bool StageFull() const;
 

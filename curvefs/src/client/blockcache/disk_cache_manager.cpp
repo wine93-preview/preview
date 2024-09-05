@@ -35,9 +35,10 @@ namespace curvefs {
 namespace client {
 namespace blockcache {
 
+using ::butil::Timer;
 using ::curve::common::LockGuard;
 using ::curvefs::base::math::kMiB;
-using ::curvefs::base::time::Now;
+using ::curvefs::base::time::TimeNow;
 
 DiskCacheManager::DiskCacheManager(uint64_t capacity, double freeSpaceRatio,
                                    uint64_t expireSec,
@@ -146,28 +147,6 @@ void DiskCacheManager::CleanupFull(uint64_t goalBytes, uint64_t goalFiles) {
   mq_->Publish(toDel);
 }
 
-void DiskCacheManager::DeleteBlocks(const std::shared_ptr<CacheItems>& toDel) {
-  uint64_t count = 0, bytes = 0;
-  ::butil::Timer timer;
-  timer.start();
-
-  for (const auto& item : *toDel) {
-    auto rc = fs_->RemoveFile(GetCachePath(item.key));
-    if (rc != BCACHE_ERROR::OK) {
-      LOG(ERROR) << "Delete block " << item.key.Filename()
-                 << " failed: " << StrErr(rc);
-      continue;
-    }
-    count++;
-    bytes += item.value.size;
-  }
-  timer.stop();
-
-  LOG(INFO) << count << " cache blocks deleted"
-            << ", free " << (bytes / kMiB) << "MiB"
-            << ", costs " << timer.u_elapsed() / 1e6 << " seconds.";
-}
-
 void DiskCacheManager::CleanupExpire() {
   uint64_t n = 0, deleted = 0, freed = 0;
   auto now = Now();
@@ -198,6 +177,30 @@ void DiskCacheManager::CleanupExpire() {
     }
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
+}
+
+void DiskCacheManager::DeleteBlocks(const std::shared_ptr<CacheItems>& toDel) {
+  Timer timer;
+  uint64_t blocks = 0, size = 0;
+
+  timer.start();
+  for (const auto& item : *toDel) {
+    BlockKey key = item.key;
+    CacheKey value = item.value;
+    auto rc = fs_->RemoveFile(GetCachePath(key));
+    if (rc != BCACHE_ERROR::OK) {
+      LOG(ERROR) << "Delete block " << key.Filename()
+                 << " failed: " << StrErr(rc);
+      continue;
+    }
+    blocks++;
+    size += value.size;
+  }
+  timer.stop();
+
+  LOG(INFO) << blocks << " cache blocks deleted"
+            << ", free " << (bytes / kMiB) << " MiB"
+            << ", costs " << timer.u_elapsed() / 1e6 << " seconds.";
 }
 
 std::string DiskCacheManager::GetCachePath(const CacheKey& key) {
