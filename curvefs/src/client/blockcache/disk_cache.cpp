@@ -126,6 +126,8 @@ BCACHE_ERROR DiskCache::Stage(const BlockKey& key, const Block& block) {
   std::string stagePath(GetStagePath(key));
   std::string cachePath(GetCachePath(key));
   rc = fs_->WriteFile(stagePath, block.data, block.size);
+  
+
   if (rc == BCACHE_ERROR::OK) {
     ctx.NextPhase(ContextPhase::LINK);
     auto err = fs_->HardLink(stagePath, cachePath);

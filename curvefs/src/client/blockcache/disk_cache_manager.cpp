@@ -65,7 +65,7 @@ void DiskCacheManager::Start() {
     mq_->Start();
     taskPool_->Start(2);  // CheckFreeSpace, CleanupExpire
     taskPool_->Enqueue(&DiskCacheManager::CheckFreeSpace, this);
-    // taskPool_->Enqueue(&DiskCacheManager::CleanupExpire, this);
+    taskPool_->Enqueue(&DiskCacheManager::CleanupExpire, this);
     LOG(INFO) << "Disk cache manager thread start success.";
   }
 }
@@ -174,6 +174,10 @@ void DiskCacheManager::CleanupExpire() {
   auto expire = TimeSpec(expireSec_);
 
   while (running_.load(std::memory_order_relaxed)) {
+    if (expireSec_ == 0) {
+      std::this_thread::sleep_for(std::chrono::seconds(3));
+    }
+
     LockGuard lk(mutex_);
     auto toDel = caches_->Evict([&](const CacheValue& value) {
       if (++n > 1e3) {
