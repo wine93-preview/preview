@@ -75,6 +75,7 @@ void DiskCacheLoader::Stop() {
 // NOTE: if load failed, it will takes up some spaces.
 void DiskCacheLoader::LoadAll(const std::string& root, BlockType type) {
   Timer timer;
+  BCACHE_ERROR rc;
   uint64_t blocks = 0, invalids = 0, size = 0;
 
   timer.start();
@@ -94,7 +95,7 @@ void DiskCacheLoader::LoadAll(const std::string& root, BlockType type) {
   timer.stop();
 
   std::ostringstream oss;
-  oss << std::fixed << std::setprecision(6) << "Load " << StrType(type)
+  oss << std::fixed << std::setprecision(6) << "Load " << ToString(type)
       << " (dir=" << root << ") " << rc << ": " << blocks << " blocks loaded"
       << ", " << invalids << " invalid blocks found"
       << ", costs " << timer.u_elapsed() / 1e6 << " seconds.";
@@ -110,12 +111,12 @@ bool DiskCacheLoader::LoadBlock(const std::string& prefix, const FileInfo& info,
                                 BlockType type) {
   BlockKey key;
   std::string name = info.name;
-  std::string path = PathJoin(prefix, name);
+  std::string path = PathJoin({prefix, name});
 
   if (HasSuffix(name, ".tmp") || !key.ParseFilename(name)) {
     auto rc = fs_->RemoveFile(path);
     if (rc != BCACHE_ERROR::OK) {
-      LOG(WARNING) << "Remove invalid block failed: " << StrErr(err);
+      LOG(WARNING) << "Remove invalid block failed: " << StrErr(rc);
     }
     return false;
   }

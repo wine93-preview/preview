@@ -62,17 +62,19 @@ class DiskCacheManager {
                    std::shared_ptr<LocalFileSystem> fs,
                    std::shared_ptr<DiskCacheLayout> layout);
 
-  void Start();
+  virtual ~DiskCacheManager() = default;
 
-  void Stop();
+  virtual void Start();
 
-  void Add(const CacheKey& key, const CacheValue& value);
+  virtual void Stop();
 
-  BCACHE_ERROR Get(const CacheKey& key, CacheValue* value);
+  virtual void Add(const CacheKey& key, const CacheValue& value);
 
-  bool StageFull() const;
+  virtual BCACHE_ERROR Get(const CacheKey& key, CacheValue* value);
 
-  bool CacheFull() const;
+  virtual bool StageFull() const;
+
+  virtual bool CacheFull() const;
 
  private:
   void CheckFreeSpace();

@@ -51,11 +51,13 @@ class DiskCacheLoader {
                   std::shared_ptr<DiskCacheLayout> layout,
                   std::shared_ptr<DiskCacheManager> manager);
 
-  void Start(UploadFunc uploader);
+  virtual ~DiskCacheLoader() = default;
 
-  void Stop();
+  virtual void Start(UploadFunc uploader);
 
-  bool IsLoading() const;
+  virtual void Stop();
+
+  virtual bool IsLoading() const;
 
  private:
   void LoadAll(const std::string& root, BlockType type);
