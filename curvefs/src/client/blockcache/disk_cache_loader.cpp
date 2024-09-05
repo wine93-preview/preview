@@ -79,14 +79,14 @@ void DiskCacheLoader::LoadAll(const std::string& root, BlockType type) {
   uint64_t blocks = 0, invalids = 0, size = 0;
 
   timer.start();
-  rc = fs_->Walk(root, [&](const std::string& prefix, const FileInfo& info) {
+  rc = fs_->Walk(root, [&](const std::string& prefix, const FileInfo& file) {
     if (!running_.load(std::memory_order_relaxed)) {
       return BCACHE_ERROR::ABORT;
     }
 
-    if (LoadBlock(prefix, info, type)) {
+    if (LoadBlock(prefix, file, type)) {
       blocks++;
-      size += info.size;
+      size += file.size;
     } else {
       invalids++;
     }
