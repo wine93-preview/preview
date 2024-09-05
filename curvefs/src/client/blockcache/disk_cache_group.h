@@ -28,7 +28,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "curvefs/src/base/ketama_con_hash.h"
+#include "curvefs/src/base/hash/ketama_con_hash.h"
 #include "curvefs/src/client/blockcache/cache_store.h"
 #include "curvefs/src/client/blockcache/disk_cache.h"
 #include "curvefs/src/client/common/config.h"
