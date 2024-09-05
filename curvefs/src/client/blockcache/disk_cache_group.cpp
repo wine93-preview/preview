@@ -23,10 +23,9 @@
 #include "curvefs/src/client/blockcache/disk_cache_group.h"
 
 #include <cassert>
-#include <map>
 
-#include "curvefs/src/base/ketama_con_hash.h"
-#include "curvefs/src/base/math.h"
+#include "curvefs/src/base/hash/ketama_con_hash.h"
+#include "curvefs/src/base/math/math.h"
 
 namespace curvefs {
 namespace client {
@@ -64,9 +63,9 @@ BCACHE_ERROR DiskCacheGroup::Init(UploadFunc uploader) {
       return rc;
     }
 
-    chash_->AddNode(store->Id(), weights[i]);
     stores_[store->Id()] = store;
-    LOG(INFO) << "Add disk cache (id=" << store->Id()
+    chash_->AddNode(store->Id(), weights[i]);
+    LOG(INFO) << "Add disk cache (dir=" << options_[i].cacheDir
               << ", weight=" << weights[i] << ") to disk cache group success.";
   }
 
