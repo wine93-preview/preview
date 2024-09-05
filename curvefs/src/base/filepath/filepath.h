@@ -36,9 +36,9 @@ std::string Filename(const std::string& path);
 
 bool HasSuffix(const std::string& path, const std::string& suffix);
 
-std::vector<std::string> Split(const std::string& path);
+std::vector<std::string> PathSplit(const std::string& path);
 
-std::string Join(const std::vector<std::string>& subpaths);
+std::string PathJoin(const std::vector<std::string>& subpaths);
 
 }  // namespace filepath
 }  // namespace base

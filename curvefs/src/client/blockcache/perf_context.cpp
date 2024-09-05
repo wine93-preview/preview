@@ -35,19 +35,19 @@ namespace blockcache {
 using ::curvefs::base::string::StrFormat;
 using ::curvefs::base::string::StrJoin;
 
-static const std::unordered_map<ContextPhase, std::string> phases = {
-    {ContextPhase::STAGE_BLOCK, "stage"},
-    {ContextPhase::CACHE_BLOCK, "cache"},
-    {ContextPhase::LOAD_BLOCK, "load"},
-    {ContextPhase::READ_BLOCK, "read"},
-    {ContextPhase::S3_PUT, "s3_put"},
-    {ContextPhase::S3_GET, "s3_get"},
-    {ContextPhase::S3_RANGE, "s3_range"},
-    {ContextPhase::OPEN_FILE, "open"},
-    {ContextPhase::WRITE_FILE, "write"},
-    {ContextPhase::LINK, "link"},
-    {ContextPhase::CACHE_ADD, "cache_add"},
-    {ContextPhase::ENQUEUE_UPLOAD, "enqueue"},
+static const std::unordered_map<Phase, std::string> phases = {
+    {Phase::STAGE_BLOCK, "stage"},
+    {Phase::CACHE_BLOCK, "cache"},
+    {Phase::LOAD_BLOCK, "load"},
+    {Phase::READ_BLOCK, "read"},
+    {Phase::S3_PUT, "s3_put"},
+    {Phase::S3_GET, "s3_get"},
+    {Phase::S3_RANGE, "s3_range"},
+    {Phase::OPEN_FILE, "open"},
+    {Phase::WRITE_FILE, "write"},
+    {Phase::LINK, "link"},
+    {Phase::CACHE_ADD, "cache_add"},
+    {Phase::ENQUEUE_UPLOAD, "enqueue"},
 };
 
 void PhaseTimer::StopLastPhase() {
@@ -58,12 +58,12 @@ void PhaseTimer::StopLastPhase() {
   }
 }
 
-void PhaseTimer::NextPhase(ContextPhase phase) {
+void PhaseTimer::NextPhase(Phase phase) {
   StopLastPhase();
   traces_.emplace_back(PhaseTrace(phase));
 }
 
-std::string PhaseTimer::StrPhase(ContextPhase phase) {
+std::string PhaseTimer::StrPhase(Phase phase) {
   auto it = phases.find(phase);
   if (it != phases.end()) {
     return it->second;

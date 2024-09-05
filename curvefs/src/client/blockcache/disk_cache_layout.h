@@ -59,7 +59,7 @@ using ::absl::StrFormat;
  *  |               ├── 2_21626898_4096_0_0
  *  |               └── 2_21626898_4097_0_0
  *  ├── probe
- *  └── .meta
+ *  └── .lock
  */
 class DiskCacheLayout {
  public:
@@ -73,7 +73,6 @@ class DiskCacheLayout {
 
   std::string GetProbeDir() const { return StrFormat("%s/probe", rootDir_); }
 
-  std::string GetLockPath() const { return StrFormat("%s/.lock", rootDir_); }
 
   std::string GetStagePath(const BlockKey& key) const {
     return StrFormat("%s/%s", GetStageDir(), key.StoreKey());
@@ -82,6 +81,8 @@ class DiskCacheLayout {
   std::string GetCachePath(const BlockKey& key) const {
     return StrFormat("%s/%s", GetCacheDir(), key.StoreKey());
   }
+
+  std::string GetLockPath() const { return StrFormat("%s/.lock", rootDir_); }
 
  private:
   std::string rootDir_;

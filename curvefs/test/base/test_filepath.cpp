@@ -20,7 +20,7 @@
  * Author: Jingli Chen (Wine93)
  */
 
-#include "curvefs/src/base/filepath.h"
+#include "curvefs/src/base/filepath/filepath.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 
@@ -49,7 +49,7 @@ TEST_F(FilepathTest, ParentDir) {
       {"", "/"},
   };
   for (const auto& t : tests) {
-    auto parent = filepath::ParentDir(t.path);
+    auto parent = ParentDir(t.path);
     ASSERT_EQ(parent, t.parent);
   }
 }
@@ -68,7 +68,7 @@ TEST_F(FilepathTest, Filename) {
       {"/", ""},
   };
   for (const auto& t : tests) {
-    auto filename = filepath::Filename(t.path);
+    auto filename = Filename(t.path);
     ASSERT_EQ(filename, t.filename);
   }
 }
@@ -110,7 +110,7 @@ TEST_F(FilepathTest, Split) {
       {"///", {}},
   };
   for (const auto& t : tests) {
-    auto out = filepath::Split(t.path);
+    auto out = PathSplit(t.path);
     ASSERT_EQ(out, t.out);
   }
 }
@@ -130,7 +130,7 @@ TEST_F(FilepathTest, Join) {
   };
 
   for (const auto& t : tests) {
-    auto out = Join(t.subpaths);
+    auto out = PathJoin(t.subpaths);
     ASSERT_EQ(out, t.out);
   }
 }

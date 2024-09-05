@@ -31,10 +31,10 @@
 #include "curvefs/src/client/blockcache/disk_cache_layout.h"
 #include "curvefs/src/client/blockcache/disk_cache_loader.h"
 #include "curvefs/src/client/blockcache/disk_cache_manager.h"
+#include "curvefs/src/client/blockcache/disk_cache_metric.h"
 #include "curvefs/src/client/blockcache/disk_state_health_checker.h"
 #include "curvefs/src/client/blockcache/error.h"
 #include "curvefs/src/client/blockcache/local_filesystem.h"
-#include "curvefs/src/client/blockcache/metric.h"
 #include "curvefs/src/client/common/config.h"
 
 namespace curvefs {

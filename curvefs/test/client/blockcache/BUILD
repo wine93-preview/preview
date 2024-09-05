@@ -20,6 +20,15 @@ TEST_BLOCK_CACHE_DEPS = [
 ]
 
 cc_test(
+    name = "test_countdown",
+    srcs = [ "test_countdown.cpp" ],
+    deps = TEST_BLOCK_CACHE_DEPS,
+    copts = CURVE_TEST_COPTS,
+    visibility = ["//visibility:public"],
+    linkstatic=1,
+)
+
+cc_test(
     name = "test_disk_cache_group",
     srcs = [ "test_disk_cache_group.cpp" ],
     deps = TEST_BLOCK_CACHE_DEPS,

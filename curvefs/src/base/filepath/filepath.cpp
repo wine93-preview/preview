@@ -20,7 +20,7 @@
  * Author: Jingli Chen (Wine93)
  */
 
-#include "curvefs/src/base/filepath.h"
+#include "curvefs/src/base/filepath/filepath.h"
 
 #include <algorithm>
 
@@ -56,7 +56,7 @@ bool HasSuffix(const std::string& path, const std::string& suffix) {
   return ::absl::EndsWith(path, suffix);
 }
 
-std::vector<std::string> Split(const std::string& path) {
+std::vector<std::string> PathSplit(const std::string& path) {
   std::vector<std::string> out;
   std::vector<std::string> names = ::absl::StrSplit(path, '/');
   std::copy_if(names.begin(), names.end(), std::back_inserter(out),
@@ -64,7 +64,7 @@ std::vector<std::string> Split(const std::string& path) {
   return out;
 }
 
-std::string Join(const std::vector<std::string>& subpaths) {
+std::string PathJoin(const std::vector<std::string>& subpaths) {
   return ::absl::StrJoin(subpaths, "/");
 }
 

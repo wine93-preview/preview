@@ -20,7 +20,7 @@
  * Author: Jingli Chen (Wine93)
  */
 
-#include "curvefs/src/base/time.h"
+#include "curvefs/src/base/time/time.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 

@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CURVEFS_SRC_BASE_KETAMA_CON_HASH_H
-#define CURVEFS_SRC_BASE_KETAMA_CON_HASH_H
+#ifndef CURVEFS_SRC_BASE_HASH_KETAMA_CON_HASH_H
+#define CURVEFS_SRC_BASE_HASH_KETAMA_CON_HASH_H
 
 #include <cstdint>
 #include <unordered_map>
 
-#include "curvefs/src/base/con_hash.h"
+#include "curvefs/src/base/hash/con_hash.h"
 
 namespace curvefs {
 namespace base {
@@ -69,4 +69,4 @@ class KetamaConHash : public ConHash {
 }  // namespace base
 }  // namespace curvefs
 
-#endif  // CURVEFS_SRC_BASE_KETAMA_CON_HASH_H
+#endif  // CURVEFS_SRC_BASE_HASH_KETAMA_CON_HASH_H

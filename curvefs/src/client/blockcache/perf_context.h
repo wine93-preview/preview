@@ -32,7 +32,7 @@ namespace curvefs {
 namespace client {
 namespace blockcache {
 
-enum class ContextPhase {
+enum class Phase {
   // block cache
   STAGE_BLOCK,
   CACHE_BLOCK,
@@ -52,9 +52,9 @@ enum class ContextPhase {
 
 class PhaseTimer {
   struct PhaseTrace {
-    PhaseTrace(ContextPhase phase) : phase(phase), elapsed(0) { timer.start(); }
+    PhaseTrace(Phase phase) : phase(phase), elapsed(0) { timer.start(); }
 
-    ContextPhase phase;
+    Phase phase;
     butil::Timer timer;
     double elapsed;
   };
@@ -64,14 +64,14 @@ class PhaseTimer {
 
   ~PhaseTimer() = default;
 
-  void NextPhase(ContextPhase phase);
+  void NextPhase(Phase phase);
 
   std::string ToString();
 
  private:
   void StopLastPhase();
 
-  std::string StrPhase(ContextPhase phase);
+  std::string StrPhase(Phase phase);
 
  private:
   std::vector<PhaseTrace> traces_;

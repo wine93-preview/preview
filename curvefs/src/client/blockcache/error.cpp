@@ -32,16 +32,16 @@ namespace blockcache {
 static const std::unordered_map<BCACHE_ERROR, std::string> errors = {
     {BCACHE_ERROR::OK, "OK"},
     {BCACHE_ERROR::NOT_FOUND, "not found"},
-    {BCACHE_ERROR::EXIST, "already exists"},
+    {BCACHE_ERROR::EXISTS, "already exists"},
     {BCACHE_ERROR::NOT_DIRECTORY, "not a directory"},
     {BCACHE_ERROR::FILE_TOO_LARGE, "file is too large"},
     {BCACHE_ERROR::END_OF_FILE, "end of file"},
     {BCACHE_ERROR::IO_ERROR, "IO error"},
     {BCACHE_ERROR::ABORT, "abort"},
-    {BCACHE_ERROR::NOT_SUPPORTED, "not supported"},
     {BCACHE_ERROR::CACHE_DOWN, "cache is down"},
     {BCACHE_ERROR::CACHE_UNHEALTHY, "cache is unhealthy"},
     {BCACHE_ERROR::CACHE_FULL, "cache is full"},
+    {BCACHE_ERROR::NOT_SUPPORTED, "not supported"},
 };
 
 std::string StrErr(BCACHE_ERROR code) {

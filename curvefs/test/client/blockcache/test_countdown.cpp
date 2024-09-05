@@ -16,41 +16,52 @@
 
 /*
  * Project: DingoFS
- * Created Date: 2024-08-19
+ * Created Date: 2024-09-05
  * Author: Jingli Chen (Wine93)
  */
 
-#ifndef CURVEFS_SRC_CLIENT_BLOCKCACHE_ERROR_H_
-#define CURVEFS_SRC_CLIENT_BLOCKCACHE_ERROR_H_
-
-#include <ostream>
-#include <string>
+#include "curvefs/src/client/blockcache/countdown.h"
+#include "glog/logging.h"
+#include "gtest/gtest.h"
 
 namespace curvefs {
 namespace client {
 namespace blockcache {
 
-enum class BCACHE_ERROR {
-  OK,
-  NOT_FOUND,
-  EXISTS,
-  NOT_DIRECTORY,
-  FILE_TOO_LARGE,
-  END_OF_FILE,
-  IO_ERROR,
-  ABORT,
-  CACHE_DOWN,
-  CACHE_UNHEALTHY,
-  CACHE_FULL,
-  NOT_SUPPORTED,
+class CountdownTest : public ::testing::Test {
+ protected:
+  void SetUp() override {}
+  void TearDown() override {}
 };
 
-std::string StrErr(BCACHE_ERROR code);
+TEST_F(CountdownTest, Basic) {
+  Countdown count;
+  ASSERT_TRUE(count.Empty());
 
-std::ostream& operator<<(std::ostream& os, BCACHE_ERROR code);
+  count.Add(1, 10);
+  ASSERT_FALSE(count.Empty());
+
+  count.Add(1, -5);
+  ASSERT_FALSE(count.Empty());
+
+  count.Add(1, -5);
+  ASSERT_TRUE(count.Empty());
+}
+
+TEST_F(CountdownTest, Add) {
+  Countdown count;
+  ASSERT_TRUE(count.Empty());
+
+  count.Add(1, 10);
+  count.Add(2, 10);
+  ASSERT_FALSE(count.Empty());
+
+  count.Add(1, -10);
+  ASSERT_FALSE(count.Empty());
+  count.Add(2, -10);
+  ASSERT_TRUE(count.Empty());
+}
 
 }  // namespace blockcache
 }  // namespace client
 }  // namespace curvefs
-
-#endif  // CURVEFS_SRC_CLIENT_BLOCKCACHE_ERROR_H_

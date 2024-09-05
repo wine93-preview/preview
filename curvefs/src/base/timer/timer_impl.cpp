@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "curvefs/src/base/timer_impl.h"
+#include "curvefs/src/base/timer/timer_impl.h"
 
 #include <sys/stat.h>
 
@@ -27,6 +27,7 @@ DEFINE_int32(timer_bg_bthread_num, 4, "background bthread number for timer");
 
 namespace curvefs {
 namespace base {
+namespace timer {
 
 using namespace std::chrono;
 
@@ -233,5 +234,6 @@ void TimerImpl::Run() {
   }
 }
 
+}  // namespace timer
 }  // namespace base
 }  // namespace curvefs

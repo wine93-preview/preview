@@ -79,7 +79,7 @@ BCACHE_ERROR PosixFileSystem::PosixError(int code, const char* format,
       rc = BCACHE_ERROR::NOT_FOUND;
       break;
     case EEXIST:
-      rc = BCACHE_ERROR::EXIST;
+      rc = BCACHE_ERROR::EXISTS;
       break;
     default:  // IO error
       break;
@@ -254,7 +254,7 @@ BCACHE_ERROR LocalFileSystem::MkDirs(const std::string& path) {
   auto rc = posix_->MkDir(path, 0755);
   if (rc == BCACHE_ERROR::OK) {
     return rc;
-  } else if (rc == BCACHE_ERROR::EXIST) {
+  } else if (rc == BCACHE_ERROR::EXISTS) {
     struct stat stat;
     rc = posix_->Stat(path, &stat);
     if (rc != BCACHE_ERROR::OK) {

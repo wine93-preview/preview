@@ -355,13 +355,13 @@ void InitBlockCacheOption(Configuration* c, BlockCacheOption* option) {
 
     {  // disk cache option
         DiskCacheOption o;
-        c->GetValueFatalIfFail("blockCache.diskCache.cacheDir",
+        c->GetValueFatalIfFail("diskCache.cacheDir",
                                &o.cacheDir);
-        c->GetValueFatalIfFail("blockCache.diskCache.cacheSize",
+        c->GetValueFatalIfFail("diskCache.cacheSize",
                                &o.cacheSize);
-        c->GetValueFatalIfFail("blockCache.diskCache.freeSpaceRatio",
+        c->GetValueFatalIfFail("diskCache.freeSpaceRatio",
                                &o.freeSpaceRatio);
-        c->GetValueFatalIfFail("blockCache.diskCache.cacheExpire",
+        c->GetValueFatalIfFail("diskCache.cacheExpire",
                                &o.cacheExpire);
 
         o.cacheSize = o.cacheSize * kMiB;

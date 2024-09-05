@@ -93,6 +93,8 @@ BCACHE_ERROR DiskCache::Init(UploadFunc uploader) {
   diskChecker_->Start();     // probe disk health
 
   LOG(INFO) << "Disk cache (dir=" << GetRootDir() << ") is up.";
+
+  metric_->SetStatus("UP");
   return BCACHE_ERROR::OK;
 }
 
@@ -105,16 +107,18 @@ BCACHE_ERROR DiskCache::Shutdown() {
   diskChecker_->Stop();
   loader_->Stop();
   manager_->Stop();
+
   LOG(INFO) << "Disk cache (dir=" << GetRootDir() << ") is down.";
+  metric_->SetStatus("DOWN");
   return BCACHE_ERROR::OK;
 }
 
 BCACHE_ERROR DiskCache::Stage(const BlockKey& key, const Block& block) {
   BCACHE_ERROR rc;
-  PhaseTimer ctx;
+  PhaseTimer timer;
   LogGuard log([&]() {
     return StrFormat("stage(%s,%d): %s %s", key.Filename(), block.size,
-                     StrErr(rc), ctx.ToString());
+                     StrErr(rc), timer.ToString());
   });
 
   rc = Check(WANT_EXEC | WANT_STAGE);
@@ -122,25 +126,27 @@ BCACHE_ERROR DiskCache::Stage(const BlockKey& key, const Block& block) {
     return rc;
   }
 
-  ctx.NextPhase(ContextPhase::WRITE_FILE);
+  timer.NextPhase(Phase::WRITE_FILE);
   std::string stagePath(GetStagePath(key));
   std::string cachePath(GetCachePath(key));
   rc = fs_->WriteFile(stagePath, block.data, block.size);
-  
-
-  if (rc == BCACHE_ERROR::OK) {
-    ctx.NextPhase(ContextPhase::LINK);
-    auto err = fs_->HardLink(stagePath, cachePath);
-    if (err == BCACHE_ERROR::OK) {
-      ctx.NextPhase(ContextPhase::CACHE_ADD);
-      manager_->Add(key, CacheValue(block.size, Now()));
-    } else {
-      LOG(WARNING) << "Link " << stagePath << " to " << cachePath
-                   << " failed: " << StrErr(err);
-    }
+  if (rc != BCACHE_ERROR::OK) {
+    return rc;
   }
 
-  ctx.NextPhase(ContextPhase::ENQUEUE_UPLOAD);
+  timer.NextPhase(Phase::LINK);
+  metric_->AddStageBlock(1, block.size);
+  rc = fs_->HardLink(stagePath, cachePath);
+  if (rc != BCACHE_ERROR::OK) {
+    rc = BCACHE_ERROR::OK;
+    LOG(WARNING) << "Link " << stagePath << " to " << cachePath
+                 << " failed: " << StrErr(rc);
+  } else {
+    timer.NextPhase(Phase::CACHE_ADD);
+    manager_->Add(key, CacheValue(block.size, Now()));
+  }
+
+  timer.NextPhase(Phase::ENQUEUE_UPLOAD);
   uploader_(key, stagePath, false);
   return rc;
 }
@@ -160,10 +166,10 @@ BCACHE_ERROR DiskCache::RemoveStage(const BlockKey& key) {
 
 BCACHE_ERROR DiskCache::Cache(const BlockKey& key, const Block& block) {
   BCACHE_ERROR rc;
-  PhaseTimer ctx;
+  PhaseTimer timer;
   LogGuard log([&]() {
     return StrFormat("cache(%s,%d): %s %s", key.Filename(), block.size,
-                     StrErr(rc), ctx.ToString());
+                     StrErr(rc), timer.ToString());
   });
 
   rc = Check(WANT_EXEC | WANT_CACHE);
@@ -171,12 +177,15 @@ BCACHE_ERROR DiskCache::Cache(const BlockKey& key, const Block& block) {
     return rc;
   }
 
-  ctx.NextPhase(ContextPhase::WRITE_FILE);
+  timer.NextPhase(Phase::WRITE_FILE);
   rc = fs_->WriteFile(GetCachePath(key), block.data, block.size);
-  if (rc == BCACHE_ERROR::OK) {
-    ctx.NextPhase(ContextPhase::CACHE_ADD);
-    manager_->Add(key, CacheValue(block.size, Now()));
+  if (rc != BCACHE_ERROR::OK) {
+    return rc;
   }
+
+  timer.NextPhase(Phase::CACHE_ADD);
+  metric_->AddCacheBlock(1, block.size);
+  manager_->Add(key, CacheValue(block.size, Now()));
   return rc;
 }
 
@@ -196,12 +205,15 @@ BCACHE_ERROR DiskCache::Load(const BlockKey& key,
     return BCACHE_ERROR::NOT_FOUND;
   }
 
-  timer.NextPhase(ContextPhase::OPEN_FILE);
+  timer.NextPhase(Phase::OPEN_FILE);
   rc = fs_->Do([&](const std::shared_ptr<PosixFileSystem> posix) {
     int fd;
     auto rc = posix->Open(GetCachePath(key), O_RDONLY, &fd);
     if (rc == BCACHE_ERROR::OK) {
+      metric_->AddCacheHit();
       reader = std::make_shared<BlockReaderImpl>(fd, fs_);
+    } else {
+      metric_->AddCacheMiss();
     }
     return rc;
   });

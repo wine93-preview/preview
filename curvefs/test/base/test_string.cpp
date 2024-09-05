@@ -20,7 +20,7 @@
  * Author: Jingli Chen (Wine93)
  */
 
-#include "curvefs/src/base/string.h"
+#include "curvefs/src/base/string/string.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 
@@ -53,14 +53,14 @@ TEST_F(StringTest, Str2Int) {
 TEST_F(StringTest, Strs2Ints) {
   uint64_t a, b, c;
 
-  ASSERT_TRUE(Strs2Ints({ "0", "1", "2" }, { &a, &b, &c }));
+  ASSERT_TRUE(Strs2Ints({"0", "1", "2"}, {&a, &b, &c}));
   ASSERT_EQ(a, 0);
   ASSERT_EQ(b, 1);
   ASSERT_EQ(c, 2);
 
-  ASSERT_FALSE(Strs2Ints({ "0", "1" }, { &a, &b, &c }));
-  ASSERT_FALSE(Strs2Ints({ "0", "1", "2" }, { &a, &b }));
-  ASSERT_FALSE(Strs2Ints({ "0", "1", "a" }, { &a, &b, &c }));
+  ASSERT_FALSE(Strs2Ints({"0", "1"}, {&a, &b, &c}));
+  ASSERT_FALSE(Strs2Ints({"0", "1", "2"}, {&a, &b}));
+  ASSERT_FALSE(Strs2Ints({"0", "1", "a"}, {&a, &b, &c}));
 }
 
 }  // namespace string

@@ -16,41 +16,42 @@
 
 /*
  * Project: DingoFS
- * Created Date: 2024-08-19
+ * Created Date: 2024-09-05
  * Author: Jingli Chen (Wine93)
  */
 
-#ifndef CURVEFS_SRC_CLIENT_BLOCKCACHE_ERROR_H_
-#define CURVEFS_SRC_CLIENT_BLOCKCACHE_ERROR_H_
-
+#include <condition_variable>
+#include <memory>
+#include <mutex>
 #include <ostream>
-#include <string>
+#include <unordered_map>
 
 namespace curvefs {
 namespace client {
 namespace blockcache {
 
-enum class BCACHE_ERROR {
-  OK,
-  NOT_FOUND,
-  EXISTS,
-  NOT_DIRECTORY,
-  FILE_TOO_LARGE,
-  END_OF_FILE,
-  IO_ERROR,
-  ABORT,
-  CACHE_DOWN,
-  CACHE_UNHEALTHY,
-  CACHE_FULL,
-  NOT_SUPPORTED,
+class Countdown {
+  struct Counter {
+    Counter() : count(0), cond(std::make_shared<std::condition_variable>()) {}
+
+    int64_t count;
+    std::shared_ptr<std::condition_variable> cond;
+  };
+
+ public:
+  Countdown() = default;
+
+  void Add(uint64_t key, int64_t n);
+
+  void Wait(uint64_t key);
+
+  bool Empty();
+
+ private:
+  std::mutex mutex_;
+  std::unordered_map<uint64_t, Counter> counters_;
 };
-
-std::string StrErr(BCACHE_ERROR code);
-
-std::ostream& operator<<(std::ostream& os, BCACHE_ERROR code);
 
 }  // namespace blockcache
 }  // namespace client
 }  // namespace curvefs
-
-#endif  // CURVEFS_SRC_CLIENT_BLOCKCACHE_ERROR_H_

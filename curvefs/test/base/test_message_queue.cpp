@@ -22,7 +22,7 @@
 
 #include <gtest/gtest.h>
 
-#include "curvefs/src/base/message_queue.h"
+#include "curvefs/src/base/queue/message_queue.h"
 
 namespace curvefs {
 namespace base {

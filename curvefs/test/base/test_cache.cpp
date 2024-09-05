@@ -18,7 +18,7 @@
 
 #include <vector>
 
-#include "curvefs/src/base/cache.h"
+#include "curvefs/src/base/cache/cache.h"
 #include "gtest/gtest.h"
 
 namespace curvefs {

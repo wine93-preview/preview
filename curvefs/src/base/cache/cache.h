@@ -29,8 +29,8 @@
 // they want something more sophisticated (like scan-resistance, a
 // custom eviction policy, variable cache sizing, etc.)
 
-#ifndef CURVEFS_SRC_BASE_CACHE_H
-#define CURVEFS_SRC_BASE_CACHE_H
+#ifndef CURVEFS_SRC_BASE_CACHE_CACHE_H
+#define CURVEFS_SRC_BASE_CACHE_CACHE_H
 
 #include <cstddef>
 #include <cstdint>
@@ -119,4 +119,4 @@ class Cache {
 }  // namespace base
 }  // namespace curvefs
 
-#endif  // CURVEFS_SRC_BASE_CACHE_H
+#endif  // CURVEFS_SRC_BASE_CACHE_CACHE_H

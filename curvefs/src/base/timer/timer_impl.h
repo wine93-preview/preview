@@ -12,21 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CURVEFS_SRC_BASE_TIMER_IMPL_H_
-#define CURVEFS_SRC_BASE_TIMER_IMPL_H_
+#ifndef CURVEFS_SRC_BASE_TIMER_TIMER_IMPL_H_
+#define CURVEFS_SRC_BASE_TIMER_TIMER_IMPL_H_
 
 #include <condition_variable>
 #include <mutex>
 #include <queue>
 #include <thread>
 
-#include "curvefs/src/base/timer.h"
+#include "curvefs/src/base/timer/timer.h"
 #include "gflags/gflags_declare.h"
 
 DECLARE_int32(timer_bg_bthread_num);
 
 namespace curvefs {
 namespace base {
+namespace timer {
 
 class TimerImpl : public Timer {
  public:
@@ -76,7 +77,8 @@ class TimerImpl : public Timer {
   std::unique_ptr<BThreadPool> thread_pool_;
 };
 
+}  // namespace timer
 }  // namespace base
 }  // namespace curvefs
 
-#endif  // CURVEFS_SRC_BASE_TIMER_IMPL_H_
+#endif  // CURVEFS_SRC_BASE_TIMER_TIMER_IMPL_H_

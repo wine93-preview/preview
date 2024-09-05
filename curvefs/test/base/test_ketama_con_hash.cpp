@@ -18,8 +18,8 @@
 #include <iomanip>
 #include <string>
 
-#include "curvefs/src/base/con_hash.h"
-#include "curvefs/src/base/ketama_con_hash.h"
+#include "curvefs/src/base/hash/con_hash.h"
+#include "curvefs/src/base/hash/ketama_con_hash.h"
 #include "gtest/gtest.h"
 
 namespace curvefs {

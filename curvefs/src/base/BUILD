@@ -18,8 +18,28 @@ load("//:copts.bzl", "CURVE_DEFAULT_COPTS")
 
 cc_library(
     name = "curvefs_base",
-    srcs = glob(["*.cpp", "*.c"]),
-    hdrs = glob(["*.h"]),
+    srcs = glob([
+      "cache/*.cpp",
+      "file/*.cpp",
+      "filepath/*.cpp",
+      "hash/*.cpp",
+      "math/*.cpp",
+      "queue/*.cpp",
+      "string/*.cpp",
+      "time/*.cpp",
+      "timer/*.cpp",
+    ]),
+    hdrs = glob([
+      "cache/*.h",
+      "file/*.h",
+      "filepath/*.h",
+      "hash/*.h",
+      "math/*.h",
+      "queue/*.h",
+      "string/*.h",
+      "time/*.h",
+      "timer/*.h",
+    ]),
     copts = CURVE_DEFAULT_COPTS,
     visibility = ["//visibility:public"],
     deps = [

@@ -20,7 +20,7 @@
  * Author: Jingli Chen (Wine93)
  */
 
-#include "curvefs/src/base/math.h"
+#include "curvefs/src/base/math/math.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 

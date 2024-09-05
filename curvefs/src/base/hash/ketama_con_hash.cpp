@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "curvefs/src/base/ketama_con_hash.h"
+#include "curvefs/src/base/hash/ketama_con_hash.h"
 
 #include <fcntl.h>
 

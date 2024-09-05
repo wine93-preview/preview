@@ -71,7 +71,7 @@ inline std::ostream& operator<<(std::ostream& os, const TimeSpec& time) {
   return os << time.seconds << "." << time.nanoSeconds;
 }
 
-inline TimeSpec Now() {
+inline TimeSpec TimeNow() {
   struct timespec now;
   clock_gettime(CLOCK_REALTIME, &now);
   return TimeSpec(now.tv_sec, now.tv_nsec);

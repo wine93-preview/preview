@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CURVEFS_SRC_BASE_TIMER_H_
-#define CURVEFS_SRC_BASE_TIMER_H_
+#ifndef CURVEFS_SRC_BASE_TIMER_TIMER_H_
+#define CURVEFS_SRC_BASE_TIMER_TIMER_H_
 
 #include <functional>
 
 namespace curvefs {
 namespace base {
+namespace timer {
 
 class Timer {
  public:
@@ -35,7 +36,8 @@ class Timer {
   virtual bool IsStopped() = 0;
 };
 
+}  // namespace timer
 }  // namespace base
 }  // namespace curvefs
 
-#endif  // CURVEFS_SRC_BASE_TIMER_H_
+#endif  // CURVEFS_SRC_BASE_TIMER_TIMER_H_

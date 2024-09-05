@@ -116,7 +116,7 @@ BCACHE_ERROR BlockCacheImpl::Put(const BlockKey& key, const Block& block) {
   });
 
   if (option_.stage) {
-    ctx.NextPhase(ContextPhase::STAGE_BLOCK);
+    ctx.NextPhase(Phase::STAGE_BLOCK);
     rc = store_->Stage(key, block);
     if (rc == BCACHE_ERROR::OK) {
       staging_->Add(key.ino, 1);
@@ -128,7 +128,7 @@ BCACHE_ERROR BlockCacheImpl::Put(const BlockKey& key, const Block& block) {
   }
 
   // TODO: Cache the block which put to storage directly
-  ctx.NextPhase(ContextPhase::S3_PUT);
+  ctx.NextPhase(Phase::S3_PUT);
   return s3_->Put(key.StoreKey(), block.data, block.size);
 }
 
@@ -142,10 +142,10 @@ BCACHE_ERROR BlockCacheImpl::Range(const BlockKey& key, off_t offset,
   });
 
   std::shared_ptr<BlockReader> reader;
-  ctx.NextPhase(ContextPhase::LOAD_BLOCK);
+  ctx.NextPhase(Phase::LOAD_BLOCK);
   rc = store_->Load(key, reader);
   if (rc == BCACHE_ERROR::OK) {
-    ctx.NextPhase(ContextPhase::READ_BLOCK);
+    ctx.NextPhase(Phase::READ_BLOCK);
     auto defer = ::absl::MakeCleanup([reader]() { reader->Close(); });
     rc = reader->ReadAt(offset, size, buffer);
     if (rc == BCACHE_ERROR::OK) {
@@ -153,7 +153,7 @@ BCACHE_ERROR BlockCacheImpl::Range(const BlockKey& key, off_t offset,
     }
   }
 
-  ctx.NextPhase(ContextPhase::S3_RANGE);
+  ctx.NextPhase(Phase::S3_RANGE);
   if (rc != BCACHE_ERROR::OK && retrive) {
     rc = s3_->Range(key.StoreKey(), offset, size, buffer);
   }

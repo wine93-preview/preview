@@ -20,7 +20,7 @@
  * Author: Jingli Chen (Wine93)
  */
 
-#include "curvefs/src/base/file.h"
+#include "curvefs/src/base/file/file.h"
 
 #include <unordered_map>
 

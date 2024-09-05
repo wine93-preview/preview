@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CURVEFS_SRC_BASE_CON_HASH_H
-#define CURVEFS_SRC_BASE_CON_HASH_H
+#ifndef CURVEFS_SRC_BASE_HASH_CON_HASH_H
+#define CURVEFS_SRC_BASE_HASH_CON_HASH_H
 
 #include <cstdint>
 #include <string>
@@ -71,4 +71,4 @@ class ConHash {
 }  // namespace base
 }  // namespace curvefs
 
-#endif  // CURVEFS_SRC_BASE_CON_HASH_H
+#endif  // CURVEFS_SRC_BASE_HASH_CON_HASH_H
