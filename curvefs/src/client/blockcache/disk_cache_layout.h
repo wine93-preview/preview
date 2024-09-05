@@ -25,14 +25,13 @@
 
 #include <string>
 
-#include "absl/strings/str_format.h"
-#include "curvefs/src/client/blockcache/cache_store.h"
+#include "curvefs/src/base/filepath/filepath.h"
 
 namespace curvefs {
 namespace client {
 namespace blockcache {
 
-using ::absl::StrFormat;
+using ::curvefs::base::filepath::PathJoin;
 
 /*
  * disk cache layout:
@@ -67,22 +66,21 @@ class DiskCacheLayout {
 
   std::string GetRootDir() const { return rootDir_; }
 
-  std::string GetStageDir() const { return StrFormat("%s/stage", rootDir_); }
+  std::string GetStageDir() const { return PathJoin({rootDir_, "stage"}); }
 
-  std::string GetCacheDir() const { return StrFormat("%s/cache", rootDir_); }
+  std::string GetCacheDir() const { return PathJoin({rootDir_, "cache"}); }
 
-  std::string GetProbeDir() const { return StrFormat("%s/probe", rootDir_); }
+  std::string GetProbeDir() const { return PathJoin({rootDir_, "probe"}); }
 
+  std::string GetLockPath() const { return PathJoin({rootDir_, ".lock"}); }
 
   std::string GetStagePath(const BlockKey& key) const {
-    return StrFormat("%s/%s", GetStageDir(), key.StoreKey());
+    return PathJoin({GetStageDir(), key.StoreKey()});
   }
 
   std::string GetCachePath(const BlockKey& key) const {
-    return StrFormat("%s/%s", GetCacheDir(), key.StoreKey());
+    return PathJoin({GetCacheDir(), key.StoreKey()});
   }
-
-  std::string GetLockPath() const { return StrFormat("%s/.lock", rootDir_); }
 
  private:
   std::string rootDir_;

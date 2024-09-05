@@ -37,11 +37,13 @@ namespace client {
 namespace blockcache {
 
 using ::curve::common::TaskThreadPool;
+using FileInfo = LocalFileSystem::FileInfo;
+using UploadFunc = CacheStore::UploadFunc;
 
 class DiskCacheLoader {
-  enum class LoadType {
-    LOAD_STAGE = 1,
-    LOAD_CACHE = 2,
+  enum class BlockType {
+    STAGE_BLOCK,
+    CACHE_BLOCK,
   };
 
  public:
@@ -49,29 +51,28 @@ class DiskCacheLoader {
                   std::shared_ptr<DiskCacheLayout> layout,
                   std::shared_ptr<DiskCacheManager> manager);
 
-  void Start(CacheStore::UploadFunc uploader);
+  void Start(UploadFunc uploader);
 
   void Stop();
 
   bool IsLoading() const;
 
  private:
-  void LoadOnce(const std::string& root, LoadType type);
+  void LoadAll(const std::string& root, BlockType type);
 
-  std::string StrType(LoadType type);
+  bool LoadBlock(const std::string& prefix, const FileInfo& info,
+                 BlockType type);
+
+  std::string ToString(BlockType type);
 
  public:
-  CacheStore::UploadFunc uploader_;
+  UploadFunc uploader_;
   std::atomic<bool> running_;
-  std::unique_ptr<TaskThreadPool<>> taskPool_;
   std::shared_ptr<LocalFileSystem> fs_;
   std::shared_ptr<DiskCacheLayout> layout_;
   std::shared_ptr<DiskCacheManager> manager_;
+  std::unique_ptr<TaskThreadPool<>> taskPool_;
 };
-
-inline bool DiskCacheLoader::IsLoading() const {
-  return running_.load(std::memory_order_release);
-}
 
 }  // namespace blockcache
 }  // namespace client

@@ -26,7 +26,7 @@
 
 #include <unordered_map>
 
-#include "curvefs/src/base/string.h"
+#include "curvefs/src/base/string/string.h"
 
 namespace curvefs {
 namespace client {
@@ -36,18 +36,12 @@ using ::curvefs::base::string::StrFormat;
 using ::curvefs::base::string::StrJoin;
 
 static const std::unordered_map<Phase, std::string> phases = {
-    {Phase::STAGE_BLOCK, "stage"},
-    {Phase::CACHE_BLOCK, "cache"},
-    {Phase::LOAD_BLOCK, "load"},
-    {Phase::READ_BLOCK, "read"},
-    {Phase::S3_PUT, "s3_put"},
-    {Phase::S3_GET, "s3_get"},
-    {Phase::S3_RANGE, "s3_range"},
-    {Phase::OPEN_FILE, "open"},
-    {Phase::WRITE_FILE, "write"},
-    {Phase::LINK, "link"},
-    {Phase::CACHE_ADD, "cache_add"},
-    {Phase::ENQUEUE_UPLOAD, "enqueue"},
+    {Phase::STAGE_BLOCK, "stage"},   {Phase::CACHE_BLOCK, "cache"},
+    {Phase::LOAD_BLOCK, "load"},     {Phase::READ_BLOCK, "read"},
+    {Phase::S3_PUT, "s3_put"},       {Phase::S3_GET, "s3_get"},
+    {Phase::S3_RANGE, "s3_range"},   {Phase::OPEN_FILE, "open"},
+    {Phase::WRITE_FILE, "write"},    {Phase::LINK, "link"},
+    {Phase::CACHE_ADD, "cache_add"}, {Phase::ENQUEUE_UPLOAD, "enqueue"},
 };
 
 void PhaseTimer::StopLastPhase() {
@@ -75,7 +69,8 @@ std::string PhaseTimer::ToString() {
   StopLastPhase();
   std::vector<std::string> out;
   for (const auto& trace : traces_) {
-    out.emplace_back(StrFormat("%s:%.6f", StrPhase(trace.phase), trace.elapsed));
+    out.emplace_back(
+        StrFormat("%s:%.6f", StrPhase(trace.phase), trace.elapsed));
   }
 
   return "(" + StrJoin(out, ",") + ")";

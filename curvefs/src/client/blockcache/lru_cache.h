@@ -29,8 +29,8 @@
 #include <string_view>
 #include <vector>
 
-#include "curvefs/src/base/cache.h"
-#include "curvefs/src/base/time.h"
+#include "curvefs/src/base/cache/cache.h"
+#include "curvefs/src/base/time/time.h"
 #include "curvefs/src/client/blockcache/cache_store.h"
 
 namespace curvefs {

@@ -26,8 +26,7 @@
 #include <functional>
 #include <string>
 
-#include "absl/strings/str_format.h"
-#include "curvefs/src/base/string.h"
+#include "curvefs/src/base/string/string.h"
 #include "curvefs/src/client/blockcache/error.h"
 
 namespace curvefs {

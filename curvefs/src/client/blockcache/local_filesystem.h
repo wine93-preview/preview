@@ -31,7 +31,7 @@
 #include <memory>
 #include <string>
 
-#include "curvefs/src/base/time.h"
+#include "curvefs/src/base/time/time.h"
 #include "curvefs/src/client/blockcache/disk_state_machine_impl.h"
 #include "curvefs/src/client/blockcache/error.h"
 
@@ -126,6 +126,7 @@ class LocalFileSystem {
 
   BCACHE_ERROR MkDirs(const std::string& path);
 
+  // NOTE: only invoke WalkFunc for file
   BCACHE_ERROR Walk(const std::string& prefix, WalkFunc func);
 
   BCACHE_ERROR WriteFile(const std::string& path, const char* buffer,
