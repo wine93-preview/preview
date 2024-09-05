@@ -107,10 +107,10 @@ void DiskCacheLoader::LoadAll(const std::string& root, BlockType type) {
   }
 }
 
-bool DiskCacheLoader::LoadBlock(const std::string& prefix, const FileInfo& info,
+bool DiskCacheLoader::LoadBlock(const std::string& prefix, const FileInfo& file,
                                 BlockType type) {
   BlockKey key;
-  std::string name = info.name;
+  std::string name = file.name;
   std::string path = PathJoin({prefix, name});
 
   if (HasSuffix(name, ".tmp") || !key.ParseFilename(name)) {
@@ -123,8 +123,8 @@ bool DiskCacheLoader::LoadBlock(const std::string& prefix, const FileInfo& info,
 
   if (type == BlockType::STAGE_BLOCK) {
     uploader_(key, path, true);
-  } else {  // cache block
-    manager_->Add(key, CacheValue(info.size, info.atime));
+  } else if (type == BlockType::CACHE_BLOCK) {
+    manager_->Add(key, CacheValue(file.size, file.atime));
   }
   return true;
 }
