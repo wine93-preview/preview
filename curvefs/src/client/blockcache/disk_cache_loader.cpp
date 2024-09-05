@@ -72,7 +72,7 @@ void DiskCacheLoader::Stop() {
   LOG(INFO) << "Disk cache loading thread stopped.";
 }
 
-// NOTE: if load failed, it will takes up some spaces.
+// If load failed, it only takes up some spaces.
 void DiskCacheLoader::LoadAll(const std::string& root, BlockType type) {
   Timer timer;
   BCACHE_ERROR rc;

@@ -39,11 +39,9 @@ namespace blockcache {
 
 using ::curvefs::base::hash::ConHash;
 using ::curvefs::client::common::DiskCacheOption;
+using UploadFunc = CacheStore::UploadFunc;
 
 class DiskCacheGroup : public CacheStore {
- public:
-  using UploadFunc = CacheStore::UploadFunc;
-
  public:
   ~DiskCacheGroup() = default;
 

@@ -53,7 +53,6 @@ using ::curvefs::client::blockcache::LRUCache;
 
 // Manage cache items and its capacity
 class DiskCacheManager {
- public:
   using MessageType = std::shared_ptr<CacheItems>;
   using MessageQueueType = MessageQueue<MessageType>;
 
@@ -95,25 +94,13 @@ class DiskCacheManager {
   double freeSpaceRatio_;
   std::atomic<bool> stageFull_;
   std::atomic<bool> cacheFull_;
-  std::atomic<bool> running_;  // thread releated
-  std::unique_ptr<TaskThreadPool<>> taskPool_;
-  std::shared_ptr<LocalFileSystem> fs_;  // other members
+  std::atomic<bool> running_;  // other members
+  std::unique_ptr<LRUCache> caches_;
+  std::shared_ptr<LocalFileSystem> fs_;
   std::shared_ptr<DiskCacheLayout> layout_;
   std::unique_ptr<MessageQueueType> mq_;
-  std::unique_ptr<LRUCache> caches_;
+  std::unique_ptr<TaskThreadPool<>> taskPool_;
 };
-
-inline bool DiskCacheManager::StageFull() const {
-  return stageFull_.load(std::memory_order_acquire);
-}
-
-inline bool DiskCacheManager::CacheFull() const {
-  return cacheFull_.load(std::memory_order_acquire);
-}
-
-inline std::string DiskCacheManager::GetCachePath(const CacheKey& key) {
-  return layout_->GetCachePath(key);
-}
 
 }  // namespace blockcache
 }  // namespace client

@@ -200,6 +200,18 @@ void DiskCacheManager::CleanupExpire() {
   }
 }
 
+std::string DiskCacheManager::GetCachePath(const CacheKey& key) {
+  return layout_->GetCachePath(key);
+}
+
+bool DiskCacheManager::StageFull() const {
+  return stageFull_.load(std::memory_order_acquire);
+}
+
+bool DiskCacheManager::CacheFull() const {
+  return cacheFull_.load(std::memory_order_acquire);
+}
+
 }  // namespace blockcache
 }  // namespace client
 }  // namespace curvefs
