@@ -34,6 +34,7 @@
 #include "curvefs/test/client/mock_metaserver_service.h"
 #include "curvefs/test/client/rpcclient/mock_mds_client.h"
 #include "src/common/curve_define.h"
+#include "curvefs/src/client"
 
 namespace curvefs {
 namespace client {
@@ -75,8 +76,8 @@ class ClientS3AdaptorTest : public testing::Test {
         option.objectPrefix = 0;
         option.diskCacheOpt.diskCacheType = (DiskCacheType)0;
         kvClientManager_ = nullptr;
-        s3ClientAdaptor_->Init(option, mockS3Client_, mockInodeManager_,
-                               mockMdsClient_, mockFsCacheManager_,
+        s3ClientAdaptor_->Init(option, mockInodeManager_,
+                               mockMdsClient_, mockFsCacheManager_, nullptr,
                                mockDiskcacheManagerImpl_, kvClientManager_);
     }
 
@@ -86,7 +87,6 @@ class ClientS3AdaptorTest : public testing::Test {
  protected:
     std::shared_ptr<S3ClientAdaptorImpl> s3ClientAdaptor_;
     std::shared_ptr<MockInodeCacheManager> mockInodeManager_;
-    std::shared_ptr<MockDiskCacheManagerImpl> mockDiskcacheManagerImpl_;
     std::shared_ptr<MockFsCacheManager> mockFsCacheManager_;
     std::shared_ptr<MockS3Client> mockS3Client_;
     std::shared_ptr<MockMdsClient> mockMdsClient_;
@@ -267,28 +267,6 @@ TEST_F(ClientS3AdaptorTest, FlushAllCache_with_no_cache) {
     EXPECT_CALL(*mockFsCacheManager_, FindFileCacheManager(_))
         .WillOnce(Return(filecache));
     EXPECT_CALL(*filecache, Flush(_, _)).WillOnce(Return(CURVEFS_ERROR::OK));
-    ASSERT_EQ(CURVEFS_ERROR::OK, s3ClientAdaptor_->FlushAllCache(1));
-}
-
-TEST_F(ClientS3AdaptorTest, FlushAllCache_with_cache) {
-     s3ClientAdaptor_->SetDiskCache(DiskCacheType::ReadWrite);
-
-    LOG(INFO) << "############ case1: clear write cache fail";
-    auto filecache = std::make_shared<MockFileCacheManager>();
-    EXPECT_CALL(*mockFsCacheManager_, FindFileCacheManager(_))
-        .WillOnce(Return(filecache));
-    EXPECT_CALL(*filecache, Flush(_, _)).WillOnce(Return(CURVEFS_ERROR::OK));
-    EXPECT_CALL(*mockDiskcacheManagerImpl_, UploadWriteCacheByInode(_))
-        .WillOnce(Return(-1));
-    ASSERT_EQ(CURVEFS_ERROR::INTERNAL, s3ClientAdaptor_->FlushAllCache(1));
-
-    LOG(INFO)
-        << "############ case2: clear write cache ok, update write cache ok ";
-    EXPECT_CALL(*mockFsCacheManager_, FindFileCacheManager(_))
-        .WillOnce(Return(filecache));
-    EXPECT_CALL(*filecache, Flush(_, _)).WillOnce(Return(CURVEFS_ERROR::OK));
-    EXPECT_CALL(*mockDiskcacheManagerImpl_, UploadWriteCacheByInode(_))
-        .WillOnce(Return(0));
     ASSERT_EQ(CURVEFS_ERROR::OK, s3ClientAdaptor_->FlushAllCache(1));
 }
 

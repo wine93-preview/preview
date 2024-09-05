@@ -23,11 +23,14 @@
 #ifndef CURVEFS_TEST_CLIENT_MOCK_CLIENT_S3_H_
 #define CURVEFS_TEST_CLIENT_MOCK_CLIENT_S3_H_
 
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <string>
+#include <gtest/gtest.h>
+
 #include <memory>
-#include "curvefs/src/client/s3/client_s3.h"
+#include <string>
+
+#include "curvefs/src/client/blockcache/block_cache.h"
+#include "curvefs/src/client/blockcache/s3_client.h"
 
 using ::testing::_;
 using ::testing::Return;
@@ -35,23 +38,35 @@ using ::testing::Return;
 namespace curvefs {
 namespace client {
 
+using ::curve::common::S3AdapterOption;
+using ::curvefs::client::blockcache::BCACHE_ERROR;
+using ::curvefs::client::blockcache::GetObjectAsyncContext;
+using ::curvefs::client::blockcache::PutObjectAsyncContext;
+using ::curvefs::client::blockcache::S3Client;
+
 class MockS3Client : public S3Client {
  public:
-    MockS3Client() {}
-    ~MockS3Client() {}
+  MockS3Client() {}
 
-    MOCK_METHOD1(Init, void(const curve::common::S3AdapterOption &options));
-    MOCK_METHOD0(Deinit, void());
-    MOCK_METHOD3(Upload, int(const std::string &name, const char *buf,
-                             uint64_t length));
-    MOCK_METHOD1(UploadAsync,
-                 void(std::shared_ptr<PutObjectAsyncContext> context));
-    MOCK_METHOD4(Download, int(const std::string &name, char *buf,
-                               uint64_t offset, uint64_t length));
-    MOCK_METHOD1(DownloadAsync,
-                 void(std::shared_ptr<GetObjectAsyncContext> context));
+  ~MockS3Client() {}
+
+  MOCK_METHOD1(Init, void(const S3AdapterOption& options));
+
+  MOCK_METHOD0(Destroy, void());
+
+  MOCK_METHOD3(Put, BCACHE_ERROR(const std::string& key, const char* buffer,
+                                 size_t size));
+
+  MOCK_METHOD4(Range, BCACHE_ERROR(const std::string& key, off_t offset,
+                                   size_t size, char* buffer));
+
+  MOCK_METHOD1(AsyncPut, void(std::shared_ptr<PutObjectAsyncContext> context));
+
+  MOCK_METHOD1(AsyncGet, void(std::shared_ptr<GetObjectAsyncContext> context));
+
+  MOCK_METHOD4(AsyncPut, void(const std::string& key, char* buffer, size_t size,
+                              RetryCallback callback));
 };
-
 
 }  // namespace client
 }  // namespace curvefs

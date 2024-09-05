@@ -138,7 +138,6 @@ class ClientS3IntegrationTest : public testing::Test {
         option.readCacheMaxByte = 104857600;
         option.writeCacheMaxByte = 10485760000;
         option.readCacheThreads = 5;
-        option.diskCacheOpt.diskCacheType = (DiskCacheType)0;
         option.chunkFlushThreads = 5;
         option.objectPrefix = 0;
         std::shared_ptr<MockInodeCacheManager> mockInodeManager(
@@ -1891,7 +1890,7 @@ TEST_F(ClientS3IntegrationTest, test_flush_write_and_read3) {
 
 /*
     ------        a     write1
-       ------     b     write2 
+       ------     b     write2
                        flush
                        releaseReadCache
        ---        b     read

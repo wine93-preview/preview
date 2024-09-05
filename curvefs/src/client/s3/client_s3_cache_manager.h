@@ -35,11 +35,12 @@
 
 #include "curvefs/proto/metaserver.pb.h"
 #include "curvefs/src/client/filesystem/error.h"
-#include "curvefs/src/client/s3/client_s3.h"
 #include "src/common/concurrent/concurrent.h"
 #include "src/common/concurrent/task_thread_pool.h"
 #include "curvefs/src/client/kvclient/kvclient_manager.h"
 #include "curvefs/src/client/inode_wrapper.h"
+#include "src/common/s3_adapter.h"
+#include "curvefs/src/client/blockcache/cache_store.h"
 
 using curve::common::ReadLockGuard;
 using curve::common::RWLock;
@@ -60,18 +61,15 @@ using DataCachePtr = std::shared_ptr<DataCache>;
 using WeakDataCachePtr = std::weak_ptr<DataCache>;
 using curve::common::GetObjectAsyncCallBack;
 using curve::common::PutObjectAsyncCallBack;
+using ::curve::common::PutObjectAsyncContext;
 using curve::common::S3Adapter;
 using curvefs::metaserver::Inode;
 using curvefs::metaserver::S3ChunkInfo;
 using curvefs::metaserver::S3ChunkInfoList;
+using ::curvefs::client::blockcache::BlockKey;
+using ::curvefs::client::blockcache::BCACHE_ERROR;
 
 enum CacheType { Write = 1, Read = 2 };
-
-enum class CachePolicy {
-    NCache,
-    RCache,
-    WRCache,
-};
 
 struct ReadRequest {
     uint64_t index;
@@ -133,6 +131,16 @@ enum DataCacheStatus {
 };
 
 class DataCache : public std::enable_shared_from_this<DataCache> {
+ public:
+    struct FlushBlock {
+        FlushBlock(BlockKey key,
+                   std::shared_ptr<PutObjectAsyncContext> context)
+            : key(key), context(context) {}
+
+        BlockKey key;
+        std::shared_ptr<PutObjectAsyncContext> context;
+    };
+
  public:
     DataCache(S3ClientAdaptorImpl *s3ClientAdaptor,
               ChunkCacheManagerPtr chunkCacheManager, uint64_t chunkPos,
@@ -211,16 +219,14 @@ class DataCache : public std::enable_shared_from_this<DataCache> {
 
     CURVEFS_ERROR PrepareFlushTasks(
         uint64_t inodeId, char *data,
-        std::vector<std::shared_ptr<PutObjectAsyncContext>> *s3Tasks,
+        std::vector<FlushBlock> *s3Tasks,
         std::vector<std::shared_ptr<SetKVCacheTask>> *kvCacheTasks,
         uint64_t *chunkId, uint64_t *writeOffset);
 
     void FlushTaskExecute(
-        CachePolicy cachePolicy,
-        const std::vector<std::shared_ptr<PutObjectAsyncContext>> &s3Tasks,
+        bool toS3,
+        const std::vector<FlushBlock> &s3Tasks,
         const std::vector<std::shared_ptr<SetKVCacheTask>> &kvCacheTasks);
-
-    CachePolicy GetCachePolicy(bool toS3);
 
  private:
     S3ClientAdaptorImpl *s3ClientAdaptor_;
@@ -234,6 +240,7 @@ class DataCache : public std::enable_shared_from_this<DataCache> {
     std::atomic<int> status_;
     std::atomic<bool> inReadCache_;
     std::map<uint64_t, PageDataMap> dataMap_;  // first is block index
+    std::vector<uint64_t> belongs_;  // which file handlers holds
 
     std::shared_ptr<KVClientManager> kvClientManager_;
 };
@@ -375,7 +382,7 @@ class FileCacheManager {
                            uint64_t fsId, uint64_t inodeId);
 
     void PrefetchS3Objs(
-        const std::vector<std::pair<std::string, uint64_t>> &prefetchObjs);
+      const std::vector<std::pair<BlockKey, uint64_t>> &prefetchObjs);
 
     void HandleReadRequest(const ReadRequest &request,
                            const S3ChunkInfo &s3ChunkInfo,
@@ -413,11 +420,11 @@ class FileCacheManager {
         S3_NOT_EXIST = -2,
     };
 
-    ReadStatus toReadStatus(const int retCode) {
+    ReadStatus toReadStatus(BCACHE_ERROR rc) {
         ReadStatus st = ReadStatus::OK;
-        if (retCode < 0) {
-            st = (retCode == -2) ? ReadStatus::S3_NOT_EXIST
-                                 : ReadStatus::S3_READ_FAIL;
+        if (rc != BCACHE_ERROR::OK) {
+            st = (rc == BCACHE_ERROR::NOT_FOUND) ? ReadStatus::S3_NOT_EXIST
+                                                 : ReadStatus::S3_READ_FAIL;
         }
         return st;
     }
@@ -431,11 +438,13 @@ class FileCacheManager {
                           uint64_t fileLen,
                           std::once_flag &cancelFlag,     // NOLINT
                           std::atomic<bool> &isCanceled,  // NOLINT
-                          std::atomic<int> &retCode);     // NOLINT
+                          std::atomic<BCACHE_ERROR> &retCode);     // NOLINT
 
     // read kv request from local disk cache
-    bool ReadKVRequestFromLocalCache(const std::string &name, char *databuf,
-                                     uint64_t offset, uint64_t len);
+    bool ReadKVRequestFromLocalCache(const BlockKey& key,
+                                     char* buffer,
+                                     uint64_t offset,
+                                     uint64_t length);
 
     // read kv request from remote cache like memcached
     bool ReadKVRequestFromRemoteCache(const std::string &name, char *databuf,
@@ -443,7 +452,8 @@ class FileCacheManager {
 
     // read kv request from s3
     bool ReadKVRequestFromS3(const std::string &name, char *databuf,
-                             uint64_t offset, uint64_t length, int *ret);
+                             uint64_t offset, uint64_t length,
+                             BCACHE_ERROR* rc);
 
     // read retry policy when read from s3 occur not exist error
     int HandleReadS3NotExist(uint32_t retry,
