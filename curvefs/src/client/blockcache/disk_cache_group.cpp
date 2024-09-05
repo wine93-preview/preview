@@ -38,22 +38,6 @@ using ::curvefs::base::math::Gcd;
 DiskCacheGroup::DiskCacheGroup(std::vector<DiskCacheOption> options)
     : options_(options), chash_(std::make_unique<KetamaConHash>()) {}
 
-std::vector<uint64_t> DiskCacheGroup::CalcWeights(
-    std::vector<DiskCacheOption> options) {
-  uint64_t gcd = 0;
-  std::vector<uint64_t> weights;
-  for (const auto& option : options) {
-    weights.push_back(option.cacheSize);
-    gcd = Gcd(gcd, option.cacheSize);
-  }
-  assert(gcd != 0);
-
-  for (int i = 0; i < weights.size(); i++) {
-    weights[i] = weights[i] / gcd;
-  }
-  return weights;
-}
-
 BCACHE_ERROR DiskCacheGroup::Init(UploadFunc uploader) {
   auto weights = CalcWeights(options_);
   for (int i = 0; i < options_.size(); i++) {
@@ -105,6 +89,22 @@ bool DiskCacheGroup::IsCached(const BlockKey& key) {
 }
 
 std::string DiskCacheGroup::Id() { return "disk_cache_group"; }
+
+std::vector<uint64_t> DiskCacheGroup::CalcWeights(
+    std::vector<DiskCacheOption> options) {
+  uint64_t gcd = 0;
+  std::vector<uint64_t> weights;
+  for (const auto& option : options) {
+    weights.push_back(option.cacheSize);
+    gcd = Gcd(gcd, option.cacheSize);
+  }
+  assert(gcd != 0);
+
+  for (int i = 0; i < weights.size(); i++) {
+    weights[i] = weights[i] / gcd;
+  }
+  return weights;
+}
 
 std::shared_ptr<DiskCache> DiskCacheGroup::GetStore(const BlockKey& key) {
   ConNode node;
