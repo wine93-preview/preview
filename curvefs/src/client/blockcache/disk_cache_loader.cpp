@@ -56,9 +56,9 @@ void DiskCacheLoader::Start(CacheStore::UploadFunc uploader) {
   uploader_ = uploader;
   taskPool_->Start(2);
   taskPool_->Enqueue(&DiskCacheLoader::LoadAll, this, layout_->GetStageDir(),
-                     LoadType::LOAD_STAGE);
+                     BlockType::STAGE_BLOCK);
   taskPool_->Enqueue(&DiskCacheLoader::LoadAll, this, layout_->GetCacheDir(),
-                     LoadType::LOAD_CACHE);
+                     BlockType::CACHE_BLOCK);
   LOG(INFO) << "Disk cache loading thread start success.";
 }
 
