@@ -29,10 +29,12 @@
 #include <limits>
 
 #include "curvefs/src/mds/codec/codec.h"
+#include "src/common/uuid.h"
 
 namespace curvefs {
 namespace mds {
 
+using ::curve::common::UUIDGenerator;
 using ::curvefs::common::S3Info;
 using ::curvefs::common::Volume;
 using google::protobuf::util::MessageDifferencer;
@@ -49,6 +51,7 @@ FsInfoWrapper::FsInfoWrapper(const ::curvefs::mds::CreateFsRequest* request,
   fsInfo.set_enablesumindir(request->enablesumindir());
   fsInfo.set_txsequence(0);
   fsInfo.set_txowner("");
+  fsInfo.set_uuid(UUIDGenerator().GenerateUUID());
   if (request->has_recycletimehour()) {
     fsInfo.set_recycletimehour(request->recycletimehour());
   }
