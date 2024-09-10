@@ -35,17 +35,42 @@ namespace blockcache {
 
 using ::curve::common::TaskThreadPool;
 
-class FlushThreadPool {
+class FlushSliceThreadPool {
  public:
   using TaskFunc = std::function<void()>;
 
  public:
-  static FlushThreadPool& GetInstance() {
-    static FlushThreadPool instance;
+  static FlushSliceThreadPool& GetInstance() {
+    static FlushSliceThreadPool instance;
     return instance;
   }
 
-  virtual ~FlushThreadPool() = default;
+  virtual ~FlushSliceThreadPool() = default;
+
+  void Init(uint32_t concurrency, uint32_t capacity) {
+    pool_ = std::make_unique<TaskThreadPool<>>();
+    pool_->Start(concurrency, capacity);
+  }
+
+  void Stop() { pool_->Stop(); }
+
+  void Enqueue(TaskFunc task) { pool_->Enqueue(task); }
+
+ private:
+  std::unique_ptr<TaskThreadPool<>> pool_;
+};
+
+class FlushFileThreadPool {
+ public:
+  using TaskFunc = std::function<void()>;
+
+ public:
+  static FlushFileThreadPool& GetInstance() {
+    static FlushFileThreadPool instance;
+    return instance;
+  }
+
+  virtual ~FlushFileThreadPool() = default;
 
   void Init(uint32_t concurrency, uint32_t capacity) {
     pool_ = std::make_unique<TaskThreadPool<>>();

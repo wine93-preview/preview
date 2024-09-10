@@ -35,10 +35,13 @@
 #include "curvefs/src/base/filepath/filepath.h"
 #include "curvefs/src/base/math/math.h"
 #include "curvefs/src/base/string/string.h"
+#include "curvefs/src/client/common/dynamic_config.h"
 
 namespace curvefs {
 namespace client {
 namespace blockcache {
+
+USING_FLAG(drop_page_cache);
 
 using ::curvefs::base::file::IsDir;
 using ::curvefs::base::file::IsFile;
@@ -186,6 +189,10 @@ BCACHE_ERROR PosixFileSystem::Write(int fd, const char* buffer, size_t count) {
     buffer += nwritten;
     count -= nwritten;
   }
+
+  if (FLAGS_drop_page_cache) {
+    Fadvise(fd);
+  }
   return BCACHE_ERROR::OK;
 }
 
@@ -200,6 +207,10 @@ BCACHE_ERROR PosixFileSystem::Read(int fd, char* buffer, size_t count) {
       return PosixError(errno, "read(%d,%d)", fd, count);
     }
     break;  // success
+  }
+
+  if (FLAGS_drop_page_cache) {
+    Fadvise(fd);
   }
   return BCACHE_ERROR::OK;
 }
@@ -236,6 +247,13 @@ BCACHE_ERROR PosixFileSystem::StatFS(const std::string& path,
                                      struct statfs* statfs) {
   if (::statfs(path.c_str(), statfs) < 0) {
     return PosixError(errno, "statfs(%s)", path);
+  }
+  return BCACHE_ERROR::OK;
+}
+
+BCACHE_ERROR PosixFileSystem::Fadvise(int fd) {
+  if (::posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED) != 0) {
+    return PosixError(errno, "posix_fadvise(%d, 0, 0, DONTNEED)", fd);
   }
   return BCACHE_ERROR::OK;
 }

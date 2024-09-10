@@ -29,8 +29,10 @@
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/synchronization/blocking_counter.h"
+#include "curvefs/src/base/string/string.h"
 #include "curvefs/src/client/blockcache/cache_store.h"
 #include "curvefs/src/client/blockcache/error.h"
+#include "curvefs/src/client/blockcache/log.h"
 #include "curvefs/src/client/blockcache/s3_client.h"
 #include "curvefs/src/client/blockcache/thread_pool.h"
 #include "curvefs/src/client/kvclient/kvclient_manager.h"
@@ -53,11 +55,14 @@ static S3MultiManagerMetric* g_s3MultiManagerMetric =
 namespace curvefs {
 namespace client {
 
+using ::curvefs::base::string::StrFormat;
 using ::curvefs::client::blockcache::BCACHE_ERROR;
 using ::curvefs::client::blockcache::Block;
 using ::curvefs::client::blockcache::CacheStore;
-using ::curvefs::client::blockcache::FlushThreadPool;
+using ::curvefs::client::blockcache::FlushFileThreadPool;
+using ::curvefs::client::blockcache::FlushSliceThreadPool;
 using ::curvefs::client::blockcache::GetObjectAsyncContext;
+using ::curvefs::client::blockcache::LogGuard;
 using ::curvefs::client::blockcache::S3ClientImpl;
 using ::curvefs::client::blockcache::StrErr;
 
@@ -278,15 +283,56 @@ int FileCacheManager::Write(uint64_t offset, uint64_t length,
 
 void FileCacheManager::WriteChunk(uint64_t index, uint64_t chunkPos,
                                   uint64_t writeLen, const char* dataBuf) {
+  std::string from;
+  double find_chunk;
+  double get_lock;
+  double find_slice;
+
+  LogGuard log([&]() {
+    return StrFormat(
+        "writechunk(%s, "
+        "%d, %d,%d,%d): <find_chunk:%.6f,get_lock:%.6f,find_slice:%.6f>",
+        from, inode_, index, chunkPos, writeLen, find_chunk, get_lock,
+        find_slice);
+  });
+
   VLOG(9) << "WriteChunk start, index: " << index << ", chunkPos: " << chunkPos;
-  ChunkCacheManagerPtr chunkCacheManager = FindOrCreateChunkCacheManager(index);
+
+  ChunkCacheManagerPtr chunkCacheManager;
+
+  // step-1: find chunk
+  {
+    ::butil::Timer timer;
+    timer.start();
+    chunkCacheManager = FindOrCreateChunkCacheManager(index);
+    timer.stop();
+    find_chunk = timer.u_elapsed() / 1e6;
+  }
+
+  // step-2: get lock
+  ::butil::Timer timer;
+  timer.start();
   WriteLockGuard writeLockGuard(chunkCacheManager->rwLockChunk_);  // todo
+  timer.stop();
+  get_lock = timer.u_elapsed() / 1e6;
+
+  // step-3: find slice
+  DataCachePtr dataCache;
   std::vector<DataCachePtr> mergeDataCacheVer;
-  DataCachePtr dataCache = chunkCacheManager->FindWriteableDataCache(
-      chunkPos, writeLen, &mergeDataCacheVer, inode_);
+  {
+    ::butil::Timer timer;
+    timer.start();
+    dataCache = chunkCacheManager->FindWriteableDataCache(
+        chunkPos, writeLen, &mergeDataCacheVer, inode_);
+    timer.stop();
+    find_slice = timer.u_elapsed() / 1e6;
+  }
+
   if (dataCache) {
+    from = "write_old";
     dataCache->Write(chunkPos, writeLen, dataBuf, mergeDataCacheVer);
   } else {
+    from = "new_data";
     chunkCacheManager->WriteNewDataCache(s3ClientAdaptor_, chunkPos, writeLen,
                                          dataBuf);
   }
@@ -1492,22 +1538,46 @@ DataCachePtr ChunkCacheManager::FindWriteableDataCache(
 void ChunkCacheManager::WriteNewDataCache(S3ClientAdaptorImpl* s3ClientAdaptor,
                                           uint32_t chunkPos, uint32_t len,
                                           const char* data) {
+  double new_slice, chunk_lock, insert_slice, metric;
+  LogGuard log([&]() {
+    return StrFormat(
+        "writeslice(%d,%d,%d): "
+        "<new_slice:%.6f,chunk_lock:%.6f,insert_slice:%.6f,metric:%.6f>",
+        index_, chunkPos, len, new_slice, chunk_lock, insert_slice, metric);
+  });
+
+  ::butil::Timer timer;
+  timer.start();
   DataCachePtr dataCache =
       std::make_shared<DataCache>(s3ClientAdaptor, this->shared_from_this(),
                                   chunkPos, len, data, kvClientManager_);
+  timer.stop();
+  new_slice = timer.u_elapsed() / 1e6;
+
   VLOG(9) << "WriteNewDataCache chunkPos:" << chunkPos << ", len:" << len
           << ", new len:" << dataCache->GetLen() << ",chunkIndex:" << index_;
 
+  timer.start();
   WriteLockGuard writeLockGuard(rwLockWrite_);
+  timer.stop();
+  chunk_lock = timer.u_elapsed() / 1e6;
 
+  timer.start();
   auto ret = dataWCacheMap_.emplace(chunkPos, dataCache);
   if (!ret.second) {
     LOG(ERROR) << "dataCache emplace failed.";
     return;
   }
+  timer.stop();
+  insert_slice = timer.u_elapsed() / 1e6;
+
+  timer.start();
   s3ClientAdaptor_->FsSyncSignalAndDataCacheInc();
   s3ClientAdaptor_->GetFsCacheManager()->DataCacheByteInc(
       dataCache->GetActualLen());
+  timer.stop();
+  metric = timer.u_elapsed() / 1e6;
+
   return;
 }
 
@@ -2012,7 +2082,9 @@ void DataCache::Write(uint64_t chunkPos, uint64_t len, const char* data,
     VLOG(9) << "mergeDataCacheVer chunkPos:" << (*iter)->GetChunkPos()
             << ", len:" << (*iter)->GetLen();
   }
+
   curve::common::LockGuard lg(mtx_);
+
   status_.store(DataCacheStatus::Dirty, std::memory_order_release);
   uint64_t oldChunkPos = chunkPos_;
   if (chunkPos <= chunkPos_) {
@@ -2343,11 +2415,11 @@ void DataCache::FlushTaskExecute(
   // success callback
   PutObjectAsyncCallBack callback =
       [&](const std::shared_ptr<PutObjectAsyncContext>& context) {
-        if (s3ClientAdaptor_->s3Metric_.get() != nullptr) {
-          s3ClientAdaptor_->CollectMetrics(
-              &s3ClientAdaptor_->s3Metric_->adaptorWriteS3, context->bufferSize,
-              context->startTime);
-        }
+        // if (s3ClientAdaptor_->s3Metric_.get() != nullptr) {
+        //   s3ClientAdaptor_->CollectMetrics(
+        //       &s3ClientAdaptor_->s3Metric_->adaptorWriteS3,
+        //       context->bufferSize, context->startTime);
+        // }
 
         // Don't move the if sentence to the front
         // it will cause core dumped because s3Metric_
@@ -2367,7 +2439,7 @@ void DataCache::FlushTaskExecute(
       auto context = fblock.context;
       BlockKey key = fblock.key;
       Block block(context->buffer, context->bufferSize);
-      FlushThreadPool::GetInstance().Enqueue([&, key, block, callback]() {
+      FlushSliceThreadPool::GetInstance().Enqueue([&, key, block, callback]() {
         for (;;) {
           auto rc = block_cache->Put(key, block);
           if (rc == BCACHE_ERROR::OK) {

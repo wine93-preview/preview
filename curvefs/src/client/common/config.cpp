@@ -180,8 +180,8 @@ void InitS3Option(Configuration* conf, S3Option* s3Opt) {
                             &s3Opt->s3ClientAdaptorOpt.prefetchBlocks);
   conf->GetValueFatalIfFail("s3.prefetchExecQueueNum",
                             &s3Opt->s3ClientAdaptorOpt.prefetchExecQueueNum);
-  conf->GetValueFatalIfFail("s3.threadScheduleInterval",
-                            &s3Opt->s3ClientAdaptorOpt.intervalSec);
+  conf->GetValueFatalIfFail("s3.threadScheduleIntervalMs",
+                            &s3Opt->s3ClientAdaptorOpt.intervalMs);
   conf->GetValueFatalIfFail("s3.cacheFlushIntervalSec",
                             &s3Opt->s3ClientAdaptorOpt.flushIntervalSec);
   conf->GetValueFatalIfFail("s3.chunkFlushThreads",
@@ -327,9 +327,14 @@ void InitBlockCacheOption(Configuration* c, BlockCacheOption* option) {
   {  // block cache option
     c->GetValueFatalIfFail("block_cache.stage", &option->stage);
     c->GetValueFatalIfFail("block_cache.logging", &FLAGS_block_cache_logging);
-    c->GetValueFatalIfFail("block_cache.flush_workers", &option->flush_workers);
-    c->GetValueFatalIfFail("block_cache.flush_queue_size",
-                           &option->flush_queue_size);
+    c->GetValueFatalIfFail("block_cache.flush_file_workers",
+                           &option->flush_file_workers);
+    c->GetValueFatalIfFail("block_cache.flush_file_queue_size",
+                           &option->flush_file_queue_size);
+    c->GetValueFatalIfFail("block_cache.flush_slice_workers",
+                           &option->flush_file_workers);
+    c->GetValueFatalIfFail("block_cache.flush_slice_queue_size",
+                           &option->flush_file_queue_size);
     c->GetValueFatalIfFail("block_cache.upload_stage_workers",
                            &option->upload_stage_workers);
     c->GetValueFatalIfFail("block_cache.upload_stage_queue_size",
@@ -348,6 +353,8 @@ void InitBlockCacheOption(Configuration* c, BlockCacheOption* option) {
                            &FLAGS_disk_cache_free_space_ratio);
     c->GetValueFatalIfFail("disk_cache.cache_expire_second",
                            &FLAGS_disk_cache_expire_second);
+    c->GetValueFatalIfFail("disk_cache.drop_page_cache",
+                           &FLAGS_drop_page_cache);
 
     o.cache_size = o.cache_size * kMiB;
     SplitDiskCacheOption(o, &option->disk_cache_options);

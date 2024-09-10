@@ -77,6 +77,8 @@ class PosixFileSystem {
 
   BCACHE_ERROR StatFS(const std::string& path, struct statfs* statfs);
 
+  BCACHE_ERROR Fadvise(int fd);
+
  private:
   template <typename... Args>
   BCACHE_ERROR PosixError(int code, const char* format, const Args&... args);

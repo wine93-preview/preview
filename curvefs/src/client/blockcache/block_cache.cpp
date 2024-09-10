@@ -58,10 +58,16 @@ BCACHE_ERROR BlockCacheImpl::Init() {
     return BCACHE_ERROR::OK;  // already initialized
   }
 
-  FlushThreadPool::GetInstance().Init(option_.flush_workers,
-                                      option_.flush_queue_size);
-  uploading_->Start(option_.upload_stage_workers,
-                    option_.upload_stage_queue_size);
+  FlushFileThreadPool::GetInstance().Init(option_.flush_file_workers,
+                                          option_.flush_file_queue_size);
+  FlushSliceThreadPool::GetInstance().Init(option_.flush_slice_workers,
+                                           option_.flush_slice_queue_size);
+  if (option_.upload_stage_queue_size == 0) {
+    uploading_->Start(option_.upload_stage_workers);
+  } else {
+    uploading_->Start(option_.upload_stage_workers,
+                      option_.upload_stage_queue_size);
+  }
   return store_->Init(
       [this](const BlockKey& key, const std::string& path, bool reload) {
         uploading_->Enqueue(&BlockCacheImpl::UploadStageBlock, this, key, path,
@@ -75,7 +81,8 @@ BCACHE_ERROR BlockCacheImpl::Shutdown() {
     return BCACHE_ERROR::OK;  // already shutting down
   }
 
-  FlushThreadPool::GetInstance().Stop();
+  FlushFileThreadPool::GetInstance().Stop();
+  FlushSliceThreadPool::GetInstance().Stop();
   store_->Shutdown();
   WaitStageBlocksUploaded();
   uploading_->Stop();

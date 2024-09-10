@@ -40,6 +40,9 @@ namespace common {
 // block cache logging
 DECLARE_bool(block_cache_logging);
 
+// disk cache
+DECLARE_bool(drop_page_cache);
+
 // disk cache manager
 DECLARE_uint64(disk_cache_expire_second);
 DECLARE_double(disk_cache_free_space_ratio);

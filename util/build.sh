@@ -192,6 +192,7 @@ build_target() {
         alltarget=...
     fi
 
+    alltarget=("curvefs/src/...")
     for target in $alltarget
     do
         bazel build ${g_build_opts[@]} $target
@@ -214,20 +215,20 @@ build_target() {
         fi
     done
 
-    # build tools-v2
-    g_toolsv2_root="tools-v2"
-    if [ $g_release -eq 1 ]
-    then
-        (cd ${g_toolsv2_root} && make build version=${curve_version})
-    else
-        (cd ${g_toolsv2_root} && make debug version=${curve_version})
-    fi
+    #build tools-v2
+    #g_toolsv2_root="tools-v2"
+    #if [ $g_release -eq 1 ]
+    #then
+    #    (cd ${g_toolsv2_root} && make build version=${curve_version})
+    #else
+    #    (cd ${g_toolsv2_root} && make debug version=${curve_version})
+    #fi
 }
 
 
 build_requirements() {
     if [[ "$g_stor" == "fs" || $g_ci -eq 1 ]]; then
-		(cd third-party && cmake -S . -B build && cmake --build build -j 16)
+		(cd third-party && cmake -S . -B build && cmake --build build -j 45)
         #kernel_version=`uname -r | awk -F . '{print $1 * 1000 + $2}'`
         #if [ $kernel_version -gt 5001 ]; then
         #    g_build_opts+=("--define IO_URING_SUPPORT=1")
@@ -237,8 +238,8 @@ build_requirements() {
         #g_memcache_root="${PWD}/thirdparties/memcache"
         #(cd ${g_memcache_root} && make build)
     fi
-    g_etcdclient_root="thirdparties/etcdclient"
-    (cd ${g_etcdclient_root} && make clean && make all)
+    #g_etcdclient_root="thirdparties/etcdclient"
+    #(cd ${g_etcdclient_root} && make clean && make all)
 }
 
 main() {

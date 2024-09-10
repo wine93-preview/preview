@@ -144,7 +144,7 @@ void DiskCacheManager::CheckFreeSpace() {
     if (cache_full) {
       double watermark = 1.0 - cfg;
 
-      LOG(WARNING) << StrFormat(
+      LOG_EVERY_SECOND(WARNING) << StrFormat(
           "Disk usage is so high, dir=%s, watermark=%.2f%%, "
           "bytes_usage=%.2f%%, files_usage=%.2f%%.",
           root_dir, watermark * 100, (1.0 - br) * 100, (1.0 - fr) * 100);
@@ -168,7 +168,9 @@ void DiskCacheManager::CleanupFull(uint64_t goal_bytes, uint64_t goal_files) {
     return FilterStatus::EVICT_IT;
   });
 
-  mq_->Publish({to_del, DeleteFrom::CACHE_FULL});
+  if (to_del->size() > 0) {
+    mq_->Publish({to_del, DeleteFrom::CACHE_FULL});
+  }
 }
 
 void DiskCacheManager::CleanupExpire() {

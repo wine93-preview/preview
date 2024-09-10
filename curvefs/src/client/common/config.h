@@ -89,7 +89,7 @@ struct S3ClientAdaptorOption {
   uint64_t pageSize;
   uint32_t prefetchBlocks;
   uint32_t prefetchExecQueueNum;
-  uint32_t intervalSec;
+  uint32_t intervalMs;
   uint32_t chunkFlushThreads;
   uint32_t flushIntervalSec;
   uint64_t writeCacheMaxByte;
@@ -201,8 +201,10 @@ struct DiskCacheOption {
 struct BlockCacheOption {
   std::string cache_store;
   bool stage;
-  uint32_t flush_workers;
-  uint32_t flush_queue_size;
+  uint32_t flush_file_workers;
+  uint32_t flush_file_queue_size;
+  uint32_t flush_slice_workers;
+  uint32_t flush_slice_queue_size;
   uint64_t upload_stage_workers;
   uint64_t upload_stage_queue_size;
   std::vector<DiskCacheOption> disk_cache_options;

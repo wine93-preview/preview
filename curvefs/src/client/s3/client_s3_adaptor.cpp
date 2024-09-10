@@ -69,7 +69,7 @@ S3ClientAdaptorImpl::Init(const S3ClientAdaptorOption& option,
   inodeManager_ = inodeManager;
   mdsClient_ = mdsClient;
   fsCacheManager_ = fsCacheManager;
-  waitInterval_.Init(option.intervalSec * 1000);
+  waitInterval_.Init(option.intervalMs);
   block_cache_ = block_cache;
   kvClientManager_ = std::move(kvClientManager);
 
@@ -102,7 +102,7 @@ S3ClientAdaptorImpl::Init(const S3ClientAdaptorOption& option,
             << ", chunk size: " << chunkSize_
             << ", prefetchBlocks: " << prefetchBlocks_
             << ", prefetchExecQueueNum: " << prefetchExecQueueNum_
-            << ", intervalSec: " << option.intervalSec
+            << ", intervalMs: " << option.intervalMs
             << ", flushIntervalSec: " << option.flushIntervalSec
             << ", writeCacheMaxByte: " << option.writeCacheMaxByte
             << ", readCacheMaxByte: " << option.readCacheMaxByte
@@ -130,6 +130,8 @@ int S3ClientAdaptorImpl::Write(uint64_t inodeId, uint64_t offset,
       // offer to do flush
       waitInterval_.StopWait();
       fsCacheManager_->WaitFlush();
+      LOG(INFO) << "<<< write cache is full, wait flush. size: " << size
+                << ", maxSize: " << maxSize;
     }
   }
   const uint64_t memCacheRatio = fsCacheManager_->MemCacheRatio();
@@ -137,6 +139,7 @@ int S3ClientAdaptorImpl::Write(uint64_t inodeId, uint64_t offset,
   if (exceedRatio > 0) {
     // offer to do flush
     waitInterval_.StopWait();
+    LOG(INFO) << "<<< Memroy cache exceed ratio";
   }
   FileCacheManagerPtr fileCacheManager =
       fsCacheManager_->FindOrCreateFileCacheManager(fsId_, inodeId);
