@@ -25,10 +25,14 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <string>
+#include <utility>
 
+#include "curvefs/src/client/blockcache/cache_store.h"
 #include "curvefs/src/client/blockcache/error.h"
 #include "curvefs/src/client/blockcache/local_filesystem.h"
 #include "curvefs/src/client/blockcache/phase_timer.h"
+#include "curvefs/src/client/blockcache/segments.h"
 #include "curvefs/src/client/common/dynamic_config.h"
 
 namespace curvefs {
@@ -36,6 +40,99 @@ namespace client {
 namespace blockcache {
 
 USING_FLAG(drop_page_cache);
+
+void PendingQueue::Push(const StageBlock& stage_block) {
+  std::unique_lock<std::mutex> lk(mutex_);
+  auto from = stage_block.ctx.from;
+  auto iter = queues_.find(from);
+  if (iter == queues_.end()) {
+    iter = queues_.emplace(from, Segments<StageBlock>(kSegmentSize)).first;
+  }
+  auto& queue = iter->second;
+  queue.Push(stage_block);
+  count_[from]++;
+}
+
+std::vector<StageBlock> PendingQueue::Pop() {
+  static std::vector<BlockFrom> pop_prority{
+      BlockFrom::CTO_FLUSH,
+      BlockFrom::NOCTO_FLUSH,
+      BlockFrom::RELOAD,
+  };
+
+  std::unique_lock<std::mutex> lk(mutex_);
+  for (const auto& from : pop_prority) {
+    auto iter = queues_.find(from);
+    if (iter != queues_.end() && iter->second.Size() != 0) {
+      auto stage_blocks = iter->second.Pop();
+      CHECK(count_[from] >= stage_blocks.size());
+      count_[from] -= stage_blocks.size();
+      return stage_blocks;
+    }
+  }
+  return std::vector<StageBlock>();
+}
+
+size_t PendingQueue::Size() {
+  std::unique_lock<std::mutex> lk(mutex_);
+  size_t size = 0;
+  for (auto& item : queues_) {
+    size += item.second.Size();
+  }
+  return size;
+}
+
+void PendingQueue::Stat(struct StatBlocks* stat) {
+  std::unique_lock<std::mutex> lk(mutex_);
+  stat->num_from_cto = count_[BlockFrom::CTO_FLUSH];
+  stat->num_from_nocto = count_[BlockFrom::NOCTO_FLUSH];
+  stat->num_from_reload = count_[BlockFrom::RELOAD];
+  stat->num_total =
+      stat->num_from_cto + stat->num_from_nocto + stat->num_from_reload;
+}
+
+UploadingQueue::UploadingQueue(size_t capacity) : capacity_(capacity) {}
+
+void UploadingQueue::Push(const StageBlock& stage_block) {
+  std::unique_lock<std::mutex> lk(mutex_);
+  while (queue_.size() == capacity_) {  // full
+    not_full_.wait(lk);
+  }
+  queue_.push(stage_block);
+  count_[stage_block.ctx.from]++;
+  not_empty_.notify_one();
+}
+
+StageBlock UploadingQueue::Pop() {
+  std::unique_lock<std::mutex> lk(mutex_);
+  while (queue_.empty()) {
+    not_empty_.wait(lk);
+  }
+
+  CHECK(queue_.size() != 0);
+  auto stage_block = queue_.top();
+  queue_.pop();
+  CHECK(count_[stage_block.ctx.from] > 0);
+  count_[stage_block.ctx.from]--;
+  not_full_.notify_one();
+  return stage_block;
+}
+
+size_t UploadingQueue::Size() {
+  std::unique_lock<std::mutex> lk(mutex_);
+  return queue_.size();
+}
+
+void UploadingQueue::Stat(struct StatBlocks* stat) {
+  std::unique_lock<std::mutex> lk(mutex_);
+  stat->num_from_cto = count_[BlockFrom::CTO_FLUSH];
+  stat->num_from_nocto = count_[BlockFrom::NOCTO_FLUSH];
+  stat->num_from_reload = count_[BlockFrom::RELOAD];
+  stat->num_total =
+      stat->num_from_cto + stat->num_from_nocto + stat->num_from_reload;
+}
+
+size_t UploadingQueue::Capacity() const { return capacity_; }
 
 BlockCacheUploader::BlockCacheUploader(std::shared_ptr<CacheStore> store,
                                        std::shared_ptr<S3Client> s3,
@@ -50,10 +147,18 @@ BlockCacheUploader::BlockCacheUploader(std::shared_ptr<CacheStore> store,
 void BlockCacheUploader::Init(uint64_t upload_workers,
                               uint64_t upload_queue_size) {
   if (!running_.exchange(true)) {
+    uploading_queue_ = std::make_shared<UploadingQueue>(upload_queue_size);
+
+    // scan stage block
     CHECK(scan_stage_thread_pool_->Start(1) == 0);
-    CHECK(upload_stage_thread_pool_->Start(upload_workers, upload_queue_size) ==
-          0);
-    scan_stage_thread_pool_->Enqueue(&BlockCacheUploader::ScanStageBlock, this);
+    scan_stage_thread_pool_->Enqueue(&BlockCacheUploader::ScaningWorker, this);
+
+    // upload stage block
+    CHECK(upload_stage_thread_pool_->Start(upload_workers) == 0);
+    for (uint64_t i = 0; i < upload_workers; i++) {
+      upload_stage_thread_pool_->Enqueue(&BlockCacheUploader::UploadingWorker,
+                                         this);
+    }
   }
 }
 
@@ -66,50 +171,102 @@ void BlockCacheUploader::Shutdown() {
 
 void BlockCacheUploader::AddStageBlock(const BlockKey& key,
                                        const std::string& stage_path,
-                                       bool from_reload) {
-  std::unique_lock<std::mutex> lk(mutex_);
-  PreUpload(key, from_reload);
-  if (!from_reload) {
-    fast_queue_.emplace_back(PendingItem(key, stage_path, from_reload));
-  } else {
-    slow_queue_.emplace_back(PendingItem(key, stage_path, from_reload));
-  }
+                                       BlockContext ctx) {
+  static std::atomic<uint64_t> seq_num(0);
+  StageBlock stage_block(seq_num.fetch_add(1, std::memory_order_relaxed), key,
+                         stage_path, ctx);
+  BeforeUpload(stage_block);
+  pending_queue_->Push(stage_block);
 }
 
-size_t BlockCacheUploader::GetPendingSize() {
-  std::unique_lock<std::mutex> lk(mutex_);
-  return fast_queue_.size() + slow_queue_.size();
-}
-
-void BlockCacheUploader::ScanStageBlock() {
+void BlockCacheUploader::ScaningWorker() {
   while (running_.load(std::memory_order_relaxed)) {
-    std::vector<PendingItem> queue;
-    {
-      std::unique_lock<std::mutex> lk(mutex_);
-      if (!fast_queue_.empty()) {
-        queue.swap(fast_queue_);
-      } else {
-        queue.swap(slow_queue_);
-      }
+    auto stage_blocks = pending_queue_->Pop();
+
+    bool wait = false;
+    if (stage_blocks.empty()) {
+      wait = true;
+    } else if (stage_blocks[0].ctx.from != BlockFrom::CTO_FLUSH &&
+               uploading_queue_->Size() >= uploading_queue_->Capacity() * 0.8) {
+      // Reserve space for stage blocks which from |CTO_FLUSH|
+      wait = true;
     }
 
-    for (const auto& item : queue) {
-      upload_stage_thread_pool_->Enqueue(&BlockCacheUploader::UploadStageBlock,
-                                         this, item);
+    if (wait) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      continue;
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    for (const auto& stage_block : stage_blocks) {
+      uploading_queue_->Push(stage_block);
+    }
   }
 }
 
-BCACHE_ERROR BlockCacheUploader::ReadBlock(const BlockKey& key,
-                                           const std::string& stage_path,
+void BlockCacheUploader::UploadingWorker() {
+  while (running_.load(std::memory_order_relaxed)) {
+    auto stage_block = uploading_queue_->Pop();
+    UploadStageBlock(stage_block);
+  }
+}
+
+void BlockCacheUploader::WaitAllStageUploaded() {
+  while (pending_queue_->Size() != 0 || uploading_queue_->Size() != 0) {
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
+}
+
+namespace {
+struct DeferVariables {
+  DeferVariables(const StageBlock& stage_block)
+      : rc(BCACHE_ERROR::OK),
+        stage_block(stage_block),
+        length(0),
+        buffer(nullptr),
+        timer(std::make_shared<PhaseTimer>()) {}
+
+  BCACHE_ERROR rc;
+  StageBlock stage_block;
+  size_t length;
+  std::shared_ptr<char> buffer;
+  std::shared_ptr<PhaseTimer> timer;
+};
+
+};  // namespace
+
+void BlockCacheUploader::UploadStageBlock(const StageBlock& stage_block) {
+  // The reason we use DeferVariables is the local variable will all freed
+  // when upload the stage block by async.
+  auto vars = std::make_shared<DeferVariables>(stage_block);
+  auto log_guard = std::make_shared<LogGuard>([vars]() {
+    return StrFormat("upload_stage(%s,%d): %s%s",
+                     vars->stage_block.key.Filename(), vars->length,
+                     StrErr(vars->rc), vars->timer->ToString());
+  });
+
+  vars->timer->NextPhase(Phase::READ_BLOCK);
+  vars->rc = ReadBlock(stage_block, vars->buffer, &vars->length);
+  if (vars->rc == BCACHE_ERROR::OK) {
+    vars->timer->NextPhase(Phase::S3_PUT);
+    UploadBlock(stage_block, vars->buffer, vars->length, log_guard);
+  } else if (vars->rc == BCACHE_ERROR::NOT_FOUND) {
+    AfterUpload(stage_block, true);
+  } else {  // retry
+    vars->timer->NextPhase(Phase::ENQUEUE_UPLOAD);
+    uploading_queue_->Push(stage_block);
+  }
+}
+
+BCACHE_ERROR BlockCacheUploader::ReadBlock(const StageBlock& stage_block,
                                            std::shared_ptr<char>& buffer,
                                            size_t* length) {
+  auto key = stage_block.key;
+  auto stage_path = stage_block.stage_path;
   auto fs = NewTempLocalFileSystem();
   auto rc = fs->ReadFile(stage_path, buffer, length, FLAGS_drop_page_cache);
   if (rc == BCACHE_ERROR::NOT_FOUND) {
-    LOG(WARNING) << "Stage block (" << key.Filename()
-                 << ") already deleted, drop it!";
+    LOG(ERROR) << "Stage block (" << key.Filename()
+               << ") already deleted, drop it!";
   } else if (rc != BCACHE_ERROR::OK) {
     LOG(ERROR) << "Read stage block (" << key.Filename()
                << ") failed: " << StrErr(rc);
@@ -117,18 +274,19 @@ BCACHE_ERROR BlockCacheUploader::ReadBlock(const BlockKey& key,
   return rc;
 }
 
-void BlockCacheUploader::UploadBlock(const BlockKey& key, bool from_reload,
+void BlockCacheUploader::UploadBlock(const StageBlock& stage_block,
                                      std::shared_ptr<char> buffer,
                                      size_t length,
                                      std::shared_ptr<LogGuard> log_guard) {
-  auto callback = [key, from_reload, buffer, log_guard, this](int code) {
+  auto callback = [stage_block, buffer, log_guard, this](int code) {
+    auto key = stage_block.key;
     if (code != 0) {
       LOG(ERROR) << "Object " << key.Filename()
                  << " upload failed, retCode=" << code;
       return true;  // retry
     }
 
-    PostUpload(key, from_reload, true);
+    AfterUpload(stage_block, false);
     auto rc = store_->RemoveStage(key);
     if (rc != BCACHE_ERROR::OK) {
       LOG(ERROR) << "Remove stage block (" << key.Filename()
@@ -136,48 +294,24 @@ void BlockCacheUploader::UploadBlock(const BlockKey& key, bool from_reload,
     }
     return false;
   };
-  s3_->AsyncPut(key.StoreKey(), buffer.get(), length, callback);
+  s3_->AsyncPut(stage_block.key.StoreKey(), buffer.get(), length, callback);
 }
 
-void BlockCacheUploader::PreUpload(const BlockKey& key, bool from_reload) {
-  if (!from_reload) {
-    stage_count_->Add(key.ino, 1);
+void BlockCacheUploader::BeforeUpload(const StageBlock& stage_block) {
+  if (NeedCount(stage_block)) {
+    stage_count_->Add(stage_block.key.ino, 1, false);
   }
 }
 
-void BlockCacheUploader::PostUpload(const BlockKey& key, bool from_reload,
-                                    bool success) {
-  if (!from_reload) {
-    stage_count_->Add(key.ino, -1);
+void BlockCacheUploader::AfterUpload(const StageBlock& stage_block,
+                                     bool has_error) {
+  if (NeedCount(stage_block)) {
+    stage_count_->Add(stage_block.key.ino, -1, has_error);
   }
 }
 
-void BlockCacheUploader::UploadStageBlock(const PendingItem& item) {
-  size_t length;
-  std::shared_ptr<char> buffer;
-  BlockKey key = item.key;
-  std::string stage_path = item.stage_path;
-  bool from_reload = item.from_reload;
-
-  BCACHE_ERROR rc;
-  auto timer = std::make_shared<PhaseTimer>();
-  auto log_guard = std::make_shared<LogGuard>([&, timer]() {
-    return StrFormat("upload_stage(%s,%d): %s%s", key.Filename(), length,
-                     StrErr(rc), timer->ToString());
-  });
-
-  timer->NextPhase(Phase::READ_BLOCK);
-  rc = ReadBlock(key, stage_path, buffer, &length);
-  if (rc == BCACHE_ERROR::OK) {
-    timer->NextPhase(Phase::S3_PUT);
-    UploadBlock(key, from_reload, buffer, length, log_guard);
-  } else if (rc == BCACHE_ERROR::NOT_FOUND) {
-    PostUpload(key, from_reload, false);
-  } else {  // retry
-    timer->NextPhase(Phase::ENQUEUE_UPLOAD);
-    upload_stage_thread_pool_->Enqueue(&BlockCacheUploader::UploadStageBlock,
-                                       this, item);
-  }
+bool BlockCacheUploader::NeedCount(const StageBlock& stage_block) {
+  return stage_block.ctx.from == BlockFrom::CTO_FLUSH;
 }
 
 }  // namespace blockcache

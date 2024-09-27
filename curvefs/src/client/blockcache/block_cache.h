@@ -30,6 +30,7 @@
 #include <string>
 
 #include "curvefs/src/client/blockcache/block_cache_metric.h"
+#include "curvefs/src/client/blockcache/block_cache_throttle.h"
 #include "curvefs/src/client/blockcache/block_cache_uploader.h"
 #include "curvefs/src/client/blockcache/cache_store.h"
 #include "curvefs/src/client/blockcache/countdown.h"
@@ -62,7 +63,8 @@ class BlockCache {
 
   virtual BCACHE_ERROR Shutdown() = 0;
 
-  virtual BCACHE_ERROR Put(const BlockKey& key, const Block& block) = 0;
+  virtual BCACHE_ERROR Put(const BlockKey& key, const Block& block,
+                           BlockContext ctx) = 0;
 
   virtual BCACHE_ERROR Range(const BlockKey& key, off_t offset, size_t length,
                              char* buffer, bool retrive = true) = 0;
@@ -86,7 +88,8 @@ class BlockCacheImpl : public BlockCache {
 
   BCACHE_ERROR Shutdown() override;
 
-  BCACHE_ERROR Put(const BlockKey& key, const Block& block) override;
+  BCACHE_ERROR Put(const BlockKey& key, const Block& block,
+                   BlockContext ctx) override;
 
   BCACHE_ERROR Range(const BlockKey& key, off_t offset, size_t length,
                      char* buffer, bool retrive = true) override;
@@ -100,9 +103,6 @@ class BlockCacheImpl : public BlockCache {
   StoreType GetStoreType() override;
 
  private:
-  void WaitAllStageUploaded();
-
- private:
   friend class BlockCacheBuilder;
 
  private:
@@ -111,6 +111,7 @@ class BlockCacheImpl : public BlockCache {
   std::shared_ptr<S3Client> s3_;
   std::shared_ptr<CacheStore> store_;
   std::shared_ptr<Countdown> stage_count_;
+  std::shared_ptr<BlockCacheThrottle> throttle_;
   std::shared_ptr<BlockCacheUploader> uploader_;
   std::unique_ptr<BlockCacheMetric> metric_;
 };
