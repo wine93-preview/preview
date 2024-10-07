@@ -75,7 +75,7 @@ class PendingQueue {
  public:
   PendingQueue() = default;
 
-  void Push(const StageBlock& block);
+  void Push(const StageBlock& stage_block);
 
   std::vector<StageBlock> Pop(bool peek = false);
 
@@ -94,7 +94,7 @@ class UploadingQueue {
  public:
   explicit UploadingQueue(size_t capacity);
 
-  void Push(const StageBlock& block);
+  void Push(const StageBlock& stage_block);
 
   StageBlock Pop();
 

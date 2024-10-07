@@ -76,11 +76,11 @@ size_t PendingQueue::Size() {
 
 void PendingQueue::Stat(struct StatBlocks* stat) {
   std::unique_lock<std::mutex> lk(mutex_);
-  stat->num_from_cto = count_[BlockFrom::CTO_FLUSH];
-  stat->num_from_nocto = count_[BlockFrom::NOCTO_FLUSH];
-  stat->num_from_reload = count_[BlockFrom::RELOAD];
-  stat->num_total =
-      stat->num_from_cto + stat->num_from_nocto + stat->num_from_reload;
+  auto num_from_cto = count_[BlockFrom::CTO_FLUSH];
+  auto num_from_nocto = count_[BlockFrom::NOCTO_FLUSH];
+  auto num_from_reload = count_[BlockFrom::RELOAD];
+  auto num_total = num_from_cto + num_from_nocto + num_from_reload;
+  *stat = StatBlocks(num_total, num_from_cto, num_from_nocto, num_from_reload);
 }
 
 UploadingQueue::UploadingQueue(size_t capacity) : capacity_(capacity) {}
@@ -117,11 +117,11 @@ size_t UploadingQueue::Size() {
 
 void UploadingQueue::Stat(struct StatBlocks* stat) {
   std::unique_lock<std::mutex> lk(mutex_);
-  stat->num_from_cto = count_[BlockFrom::CTO_FLUSH];
-  stat->num_from_nocto = count_[BlockFrom::NOCTO_FLUSH];
-  stat->num_from_reload = count_[BlockFrom::RELOAD];
-  stat->num_total =
-      stat->num_from_cto + stat->num_from_nocto + stat->num_from_reload;
+  auto num_from_cto = count_[BlockFrom::CTO_FLUSH];
+  auto num_from_nocto = count_[BlockFrom::NOCTO_FLUSH];
+  auto num_from_reload = count_[BlockFrom::RELOAD];
+  auto num_total = num_from_cto + num_from_nocto + num_from_reload;
+  *stat = StatBlocks(num_total, num_from_cto, num_from_nocto, num_from_reload);
 }
 
 size_t UploadingQueue::Capacity() const { return capacity_; }
