@@ -132,16 +132,17 @@ class BlockCacheUploader {
           stage_block(stage_block),
           length(0),
           buffer(nullptr),
-          timer(std::make_shared<PhaseTimer>()) {}
-
-    ~UploadingBlockContext() {
-      LogGuard log_it([this]() {
+          timer(std::make_shared<PhaseTimer>()) {
+      log_guard = std::make_shared<LogGuard>([this]() {
         return StrFormat("upload_stage(%s,%d): %s%s",
-                         stage_block.key.Filename(), length, StrErr(rc),
-                         timer->ToString());
+                         this->stage_block.key.Filename(), this->length,
+                         StrErr(this->rc), this->timer->ToString());
       });
     }
 
+    ~UploadingBlockContext() = default;
+
+    std::shared_ptr<LogGuard> log_guard;
     BCACHE_ERROR rc;
     StageBlock stage_block;
     size_t length;

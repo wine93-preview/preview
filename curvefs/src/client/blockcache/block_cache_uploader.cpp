@@ -222,27 +222,9 @@ void BlockCacheUploader::WaitAllStageUploaded() {
   }
 }
 
-namespace {
-struct DeferVariables {
-  DeferVariables(const StageBlock& stage_block)
-      : rc(BCACHE_ERROR::OK),
-        stage_block(stage_block),
-        length(0),
-        buffer(nullptr),
-        timer(std::make_shared<PhaseTimer>()) {}
-
-  BCACHE_ERROR rc;
-  StageBlock stage_block;
-  size_t length;
-  std::shared_ptr<char> buffer;
-  std::shared_ptr<PhaseTimer> timer;
-};
-
-};  // namespace
-
 void BlockCacheUploader::UploadStageBlock(const StageBlock& stage_block) {
   auto ctx = std::make_shared<UploadingBlockContext>(stage_block);
-  auto log_guard = std::make_shared<LogGuard>([ctx]() {
+  ctx->log_guard = std::make_shared<LogGuard>([ctx]() {
     return StrFormat("upload_stage(%s,%d): %s%s",
                      ctx->stage_block.key.Filename(), ctx->length,
                      StrErr(ctx->rc), ctx->timer->ToString());
