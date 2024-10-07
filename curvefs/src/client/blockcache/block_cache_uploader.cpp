@@ -224,11 +224,6 @@ void BlockCacheUploader::WaitAllStageUploaded() {
 
 void BlockCacheUploader::UploadStageBlock(const StageBlock& stage_block) {
   auto ctx = std::make_shared<UploadingBlockContext>(stage_block);
-  ctx->log_guard = std::make_shared<LogGuard>([ctx]() {
-    return StrFormat("upload_stage(%s,%d): %s%s",
-                     ctx->stage_block.key.Filename(), ctx->length,
-                     StrErr(ctx->rc), ctx->timer->ToString());
-  });
 
   ctx->timer->NextPhase(Phase::READ_BLOCK);
   ReadBlock(ctx);
