@@ -45,21 +45,24 @@ USING_FLAG(block_cache_stage_bandwidth_throttle_mb);
 using ::curve::common::TaskThreadPool;
 using ::curvefs::client::common::BlockCacheOption;
 
-static void PrintPending(std::ostream& os, void* arg) {
-  auto* pending_queue = reinterpret_cast<PendingQueue*>(arg);
-  struct StatBlocks stat;
-  pending_queue->Stat(&stat);
-  os << stat.num_total << "," << stat.num_from_cto << "," << stat.num_from_nocto
-     << "," << stat.num_from_reload;
-}
+class BlockCacheMetricHelper {
+ public:
+  static void PrintUploading(std::ostream& os, void* arg) {
+    auto* uploader = reinterpret_cast<BlockCacheUploader*>(arg);
+    struct StatBlocks stat;
+    uploader->uploading_queue_->Stat(&stat);
+    os << stat.num_total << "," << stat.num_from_cto << ","
+       << stat.num_from_nocto << "," << stat.num_from_reload;
+  }
 
-static void PrintUploading(std::ostream& os, void* arg) {
-  auto* uploading_queue = reinterpret_cast<UploadingQueue*>(arg);
-  struct StatBlocks stat;
-  uploading_queue->Stat(&stat);
-  os << stat.num_total << "," << stat.num_from_cto << "," << stat.num_from_nocto
-     << "," << stat.num_from_reload;
-}
+  static void PrintPending(std::ostream& os, void* arg) {
+    auto* uploader = reinterpret_cast<BlockCacheUploader*>(arg);
+    struct StatBlocks stat;
+    uploader->pending_queue_->Stat(&stat);
+    os << stat.num_total << "," << stat.num_from_cto << ","
+       << stat.num_from_nocto << "," << stat.num_from_reload;
+  }
+};
 
 static bool IsThrottleEnable(void*) {
   return FLAGS_block_cache_stage_bandwidth_throttle_enable;
@@ -100,11 +103,11 @@ class BlockCacheMetric {
         : upload_stage_workers(prefix, "upload_stage_workers", 0),
           upload_stage_queue_size(prefix, "upload_stage_queue_size", 0),
           stage_blocks_on_pending(prefix, "stage_blocks_on_pending",
-                                  &PrintPending,
-                                  aux_member.uploader->pending_queue_.get()),
-          stage_blocks_on_uploading(
-              prefix, "stage_blocks_on_uploading", &PrintUploading,
-              aux_member.uploader->uploading_queue_.get()),
+                                  &BlockCacheMetricHelper::PrintPending,
+                                  aux_member.uploader.get()),
+          stage_blocks_on_uploading(prefix, "stage_blocks_on_uploading",
+                                    &BlockCacheMetricHelper::PrintUploading,
+                                    aux_member.uploader.get()),
           stage_bandwidth_throttle_enable(prefix,
                                           "stage_bandwidth_throttle_enable",
                                           &IsThrottleEnable, nullptr),

@@ -53,7 +53,7 @@ void PendingQueue::Push(const StageBlock& stage_block) {
   count_[from]++;
 }
 
-std::vector<StageBlock> PendingQueue::Pop() {
+std::vector<StageBlock> PendingQueue::Pop(bool peek) {
   static std::vector<BlockFrom> pop_prority{
       BlockFrom::CTO_FLUSH,
       BlockFrom::NOCTO_FLUSH,
@@ -64,7 +64,11 @@ std::vector<StageBlock> PendingQueue::Pop() {
   for (const auto& from : pop_prority) {
     auto iter = queues_.find(from);
     if (iter != queues_.end() && iter->second.Size() != 0) {
-      auto stage_blocks = iter->second.Pop();
+      auto stage_blocks = iter->second.Pop(peek);
+      if (peek) {
+        return stage_blocks;
+      }
+
       CHECK(count_[from] >= stage_blocks.size());
       count_[from] -= stage_blocks.size();
       return stage_blocks;
@@ -141,19 +145,20 @@ BlockCacheUploader::BlockCacheUploader(std::shared_ptr<CacheStore> store,
   scan_stage_thread_pool_ =
       std::make_unique<TaskThreadPool<>>("scan_stage_worker");
   upload_stage_thread_pool_ =
-      std::make_shared<TaskThreadPool<>>("upload_stage_worker");
+      std::make_unique<TaskThreadPool<>>("upload_stage_worker");
 }
 
 void BlockCacheUploader::Init(uint64_t upload_workers,
                               uint64_t upload_queue_size) {
   if (!running_.exchange(true)) {
+    pending_queue_ = std::make_shared<PendingQueue>();
     uploading_queue_ = std::make_shared<UploadingQueue>(upload_queue_size);
 
-    // scan stage block
+    // scan stage block worker
     CHECK(scan_stage_thread_pool_->Start(1) == 0);
     scan_stage_thread_pool_->Enqueue(&BlockCacheUploader::ScaningWorker, this);
 
-    // upload stage block
+    // upload stage block worker
     CHECK(upload_stage_thread_pool_->Start(upload_workers) == 0);
     for (uint64_t i = 0; i < upload_workers; i++) {
       upload_stage_thread_pool_->Enqueue(&BlockCacheUploader::UploadingWorker,
@@ -181,13 +186,13 @@ void BlockCacheUploader::AddStageBlock(const BlockKey& key,
 
 void BlockCacheUploader::ScaningWorker() {
   while (running_.load(std::memory_order_relaxed)) {
-    auto stage_blocks = pending_queue_->Pop();
+    auto stage_blocks = pending_queue_->Pop(true);
 
     bool wait = false;
     if (stage_blocks.empty()) {
       wait = true;
     } else if (stage_blocks[0].ctx.from != BlockFrom::CTO_FLUSH &&
-               uploading_queue_->Size() >= uploading_queue_->Capacity() * 0.8) {
+               uploading_queue_->Size() >= uploading_queue_->Capacity() * 0.5) {
       // Reserve space for stage blocks which from |CTO_FLUSH|
       wait = true;
     }
@@ -197,6 +202,7 @@ void BlockCacheUploader::ScaningWorker() {
       continue;
     }
 
+    stage_blocks = pending_queue_->Pop();
     for (const auto& stage_block : stage_blocks) {
       uploading_queue_->Push(stage_block);
     }

@@ -40,7 +40,7 @@ class Segments {
 
   void Push(T element);
 
-  Segment Pop();
+  Segment Pop(bool peek = false);
 
   size_t Size();
 
@@ -65,12 +65,15 @@ void Segments<T>::Push(T element) {
 }
 
 template <typename T>
-typename Segments<T>::Segment Segments<T>::Pop() {
+typename Segments<T>::Segment Segments<T>::Pop(bool peek) {
   if (segments_.empty()) {
     return Segment();
   }
 
   auto segment = segments_.front();
+  if (peek) {
+    return segment;
+  }
   segments_.pop();
   DCHECK(size_ >= segment.size());
   size_ -= segment.size();

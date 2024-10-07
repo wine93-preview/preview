@@ -82,7 +82,7 @@ class PendingQueue {
 
   void Push(const StageBlock& block);
 
-  std::vector<StageBlock> Pop();
+  std::vector<StageBlock> Pop(bool peek = false);
 
   size_t Size();
 
@@ -125,6 +125,8 @@ class UploadingQueue {
  * [stage block]------> [ pending queue ] -------> [ uploading queue ] -> [s3]
  */
 class BlockCacheUploader {
+  struct UploadingBlockContext {};
+
  public:
   BlockCacheUploader(std::shared_ptr<CacheStore> store,
                      std::shared_ptr<S3Client> s3,
@@ -143,6 +145,7 @@ class BlockCacheUploader {
 
  private:
   friend class BlockCacheMetric;
+  friend class BlockCacheMetricHelper;
 
  private:
   void ScaningWorker();
@@ -172,7 +175,7 @@ class BlockCacheUploader {
   std::shared_ptr<PendingQueue> pending_queue_;
   std::shared_ptr<UploadingQueue> uploading_queue_;
   std::unique_ptr<TaskThreadPool<>> scan_stage_thread_pool_;
-  std::shared_ptr<TaskThreadPool<>> upload_stage_thread_pool_;
+  std::unique_ptr<TaskThreadPool<>> upload_stage_thread_pool_;
 };
 
 }  // namespace blockcache
