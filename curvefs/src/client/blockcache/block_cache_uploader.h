@@ -33,6 +33,7 @@
 #include "curvefs/src/client/blockcache/cache_store.h"
 #include "curvefs/src/client/blockcache/countdown.h"
 #include "curvefs/src/client/blockcache/log.h"
+#include "curvefs/src/client/blockcache/phase_timer.h"
 #include "curvefs/src/client/blockcache/s3_client.h"
 #include "curvefs/src/client/blockcache/segments.h"
 #include "src/common/concurrent/task_thread_pool.h"
@@ -125,7 +126,28 @@ class UploadingQueue {
  * [stage block]------> [ pending queue ] -------> [ uploading queue ] -> [s3]
  */
 class BlockCacheUploader {
-  struct UploadingBlockContext {};
+  struct UploadingBlockContext {
+    UploadingBlockContext(const StageBlock& stage_block)
+        : rc(BCACHE_ERROR::OK),
+          stage_block(stage_block),
+          length(0),
+          buffer(nullptr),
+          timer(std::make_shared<PhaseTimer>()) {}
+
+    ~UploadingBlockContext() {
+      LogGuard log_it([this]() {
+        return StrFormat("upload_stage(%s,%d): %s%s",
+                         stage_block.key.Filename(), length, StrErr(rc),
+                         timer->ToString());
+      });
+    }
+
+    BCACHE_ERROR rc;
+    StageBlock stage_block;
+    size_t length;
+    std::shared_ptr<char> buffer;
+    std::shared_ptr<PhaseTimer> timer;
+  };
 
  public:
   BlockCacheUploader(std::shared_ptr<CacheStore> store,
@@ -144,7 +166,6 @@ class BlockCacheUploader {
   void WaitAllStageUploaded();
 
  private:
-  friend class BlockCacheMetric;
   friend class BlockCacheMetricHelper;
 
  private:
@@ -154,11 +175,9 @@ class BlockCacheUploader {
 
   void UploadStageBlock(const StageBlock& stage_block);
 
-  BCACHE_ERROR ReadBlock(const StageBlock& stage_block,
-                         std::shared_ptr<char>& buffer, size_t* length);
+  void ReadBlock(std::shared_ptr<UploadingBlockContext> ctx);
 
-  void UploadBlock(const StageBlock& stage_block, std::shared_ptr<char> buffer,
-                   size_t length, std::shared_ptr<LogGuard> log_guard);
+  void UploadBlock(std::shared_ptr<UploadingBlockContext> ctx);
 
   void BeforeUpload(const StageBlock& stage_block);
 

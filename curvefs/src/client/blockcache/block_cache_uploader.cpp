@@ -241,35 +241,34 @@ struct DeferVariables {
 };  // namespace
 
 void BlockCacheUploader::UploadStageBlock(const StageBlock& stage_block) {
-  // The reason we use DeferVariables is the local variable will all freed
-  // when upload the stage block by async.
-  auto vars = std::make_shared<DeferVariables>(stage_block);
-  auto log_guard = std::make_shared<LogGuard>([vars]() {
+  auto ctx = std::make_shared<UploadingBlockContext>(stage_block);
+  auto log_guard = std::make_shared<LogGuard>([ctx]() {
     return StrFormat("upload_stage(%s,%d): %s%s",
-                     vars->stage_block.key.Filename(), vars->length,
-                     StrErr(vars->rc), vars->timer->ToString());
+                     ctx->stage_block.key.Filename(), ctx->length,
+                     StrErr(ctx->rc), ctx->timer->ToString());
   });
 
-  vars->timer->NextPhase(Phase::READ_BLOCK);
-  vars->rc = ReadBlock(stage_block, vars->buffer, &vars->length);
-  if (vars->rc == BCACHE_ERROR::OK) {
-    vars->timer->NextPhase(Phase::S3_PUT);
-    UploadBlock(stage_block, vars->buffer, vars->length, log_guard);
-  } else if (vars->rc == BCACHE_ERROR::NOT_FOUND) {
+  ctx->timer->NextPhase(Phase::READ_BLOCK);
+  ReadBlock(ctx);
+  if (ctx->rc == BCACHE_ERROR::OK) {
+    ctx->timer->NextPhase(Phase::S3_PUT);
+    UploadBlock(ctx);
+  } else if (ctx->rc == BCACHE_ERROR::NOT_FOUND) {
     AfterUpload(stage_block, true);
   } else {  // retry
-    vars->timer->NextPhase(Phase::ENQUEUE_UPLOAD);
+    ctx->timer->NextPhase(Phase::ENQUEUE_UPLOAD);
     uploading_queue_->Push(stage_block);
   }
 }
 
-BCACHE_ERROR BlockCacheUploader::ReadBlock(const StageBlock& stage_block,
-                                           std::shared_ptr<char>& buffer,
-                                           size_t* length) {
+void BlockCacheUploader::ReadBlock(std::shared_ptr<UploadingBlockContext> ctx) {
+  auto stage_block = ctx->stage_block;
   auto key = stage_block.key;
   auto stage_path = stage_block.stage_path;
+
   auto fs = NewTempLocalFileSystem();
-  auto rc = fs->ReadFile(stage_path, buffer, length, FLAGS_drop_page_cache);
+  auto rc = fs->ReadFile(stage_path, ctx->buffer, &ctx->length,
+                         FLAGS_drop_page_cache);
   if (rc == BCACHE_ERROR::NOT_FOUND) {
     LOG(ERROR) << "Stage block (" << key.Filename()
                << ") already deleted, drop it!";
@@ -277,14 +276,14 @@ BCACHE_ERROR BlockCacheUploader::ReadBlock(const StageBlock& stage_block,
     LOG(ERROR) << "Read stage block (" << key.Filename()
                << ") failed: " << StrErr(rc);
   }
-  return rc;
+
+  ctx->rc = rc;
 }
 
-void BlockCacheUploader::UploadBlock(const StageBlock& stage_block,
-                                     std::shared_ptr<char> buffer,
-                                     size_t length,
-                                     std::shared_ptr<LogGuard> log_guard) {
-  auto callback = [stage_block, buffer, log_guard, this](int code) {
+void BlockCacheUploader::UploadBlock(
+    std::shared_ptr<UploadingBlockContext> ctx) {
+  auto callback = [ctx, this](int code) {
+    auto stage_block = ctx->stage_block;
     auto key = stage_block.key;
     if (code != 0) {
       LOG(ERROR) << "Object " << key.Filename()
@@ -300,7 +299,8 @@ void BlockCacheUploader::UploadBlock(const StageBlock& stage_block,
     }
     return false;
   };
-  s3_->AsyncPut(stage_block.key.StoreKey(), buffer.get(), length, callback);
+  s3_->AsyncPut(ctx->stage_block.key.StoreKey(), ctx->buffer.get(), ctx->length,
+                callback);
 }
 
 void BlockCacheUploader::BeforeUpload(const StageBlock& stage_block) {
